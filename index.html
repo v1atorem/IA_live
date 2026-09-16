@@ -293,7 +293,7 @@ function planMini(fact,per){
 function planSuffix(fact,per){if(!per)return '';const pct=Math.round(fact/per*100);const gap=Math.round(per-fact);return ' · '+pct+'% плана'+(gap>0?' (−'+fmtInt(gap)+')':' ✓');}
 function clicksByGroup(keyFn){const clk={};const seen={};for(const r of DATA){const key=keyFn(r),mn=norm(r.m),kk=key+'|'+mn;if(seen[kk])continue;seen[kk]=1;const fd=fbData[mn];if(fd)clk[key]=(clk[key]||0)+fd.clicks;}return clk;}
 /* ====== Бэкенд: Google Apps Script (JSON) · страница на GitHub Pages ====== */
-const API_URL = "https://script.google.com/macros/s/AKfycbxAUeDvXFg5egLr3BiIL1OmoloIlnb8kLiW9xHyI--dOAtWJbZsLcGrOF3tKd3E8HXI/exec";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
+const API_URL = "https://script.google.com/macros/s/AKfycbxOH5AlFbnyfE0T9jf0uaKl-29Hnu3YCPuHhH3_ULtrW86gGSfRwa4s9VHQ-l8D0Bgn/exec";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
 function hasAPI(){ return typeof API_URL==='string' && /^https:\/\//.test(API_URL) && API_URL.indexOf('PASTE_')<0; }
 function hasGAS(){ return hasAPI(); }
 let liveData=null, liveApplied=false, manualLoaded=false;
@@ -306,7 +306,7 @@ function applyLive(d){
   if(typeof d==='string'){try{d=JSON.parse(d);}catch(e){return;}}
   if(d.error){ setSrcHtml('Ошибка API: '+d.error); resetSyncBtn(); return; }
   if(!Array.isArray(d.records)||!d.records.length){ setSrcHtml('⚠ За период данных не найдено.'); resetSyncBtn(); return; }
-  manualLoaded=false; liveData=d; records=d.records; resetSyncBtn();
+  manualLoaded=false; liveData=d; records=markSarafanka(d.records); resetSyncBtn();
   if(d.fbData&&typeof d.fbData==='object'){ fbData=d.fbData; fbLoaded=true; fbCur=d.fbCur||'usd'; cfg.spend={}; }
   if(d.payMap&&typeof d.payMap==='object'){ payMap=d.payMap; payLoaded=true; paySample=false; }
   if(!liveApplied){ flt={preset:flt.preset||'all',from:flt.from||'',to:flt.to||'',dirs:[],cities:[],sources:[]}; }
@@ -329,10 +329,13 @@ function requestSync(){
 }
 function loadPlanGAS(){ if(!hasAPI())return; apiGet({action:'getplan'}).then(function(p){ let pl=(p&&p.plan!=null)?p.plan:p; if(typeof pl==='string'){try{pl=JSON.parse(pl);}catch(e){pl=null;}} if(pl&&typeof pl==='object'){cfg.plan=pl; if(curTab==='plan')renderPanel(); else renderKPIs();} }).catch(function(){}); }
 function savePlan(){ save(); if(hasAPI()){ try{ apiGet({action:'setplan',plan:JSON.stringify(cfg.plan)}).catch(function(){}); }catch(e){} } }
+function loadMapShared(){ if(!hasAPI())return; apiGet({action:'getmap'}).then(function(m){ var mm=(m&&m.map!=null)?m.map:m; if(typeof mm==='string'){try{mm=JSON.parse(mm);}catch(e){mm=null;}} if(mm&&typeof mm==='object'){ if(mm.map&&typeof mm.map==='object')cfg.map=mm.map; if(mm.pkgmap&&typeof mm.pkgmap==='object')cfg.pkgmap=mm.pkgmap; save(); if(curTab==='map')renderPanel(); else recompute(false);} }).catch(function(){}); }
+var __mapT=null;
+function saveMapShared(){ if(!hasAPI())return; clearTimeout(__mapT); __mapT=setTimeout(function(){ try{ apiGet({action:'setmap',map:JSON.stringify({map:cfg.map,pkgmap:cfg.pkgmap})}).catch(function(){}); }catch(e){} }, 600); }
 function gasBoot(){
   if(!hasAPI()){ setSrcHtml('Файл-пример. Впиши URL Apps Script в API_URL вверху файла, чтобы тянуть данные из API.'); return; }
   const b=document.getElementById('apiSync'); if(b){ b.hidden=false; b.addEventListener('click',requestSync); }
-  loadPlanGAS();
+  loadPlanGAS(); loadMapShared();
   const r=rangeOrDefault();
   setSrcHtml('⏳ Загрузка данных…');
   apiGet({action:'data',from:r[0],to:r[1],force:0}).then(applyLive).catch(function(e){ setSrcHtml('Автозагрузка из API не удалась: '+e.message); });
@@ -364,6 +367,7 @@ function save(){try{localStorage.setItem('cfg_v1',JSON.stringify(cfg))}catch(e){
 /* ---------- helpers ---------- */
 function baseStage(st){const n=norm(st);return n.startsWith('закрыто и не реализовано')?'закрыто и не реализовано':n;}
 function reasonOf(r){const n=norm(r.st);const m=n.match(/^закрыто и не реализовано\s*\((.*)\)\s*$/);return m?m[1].trim():norm(r.rs);}
+function markSarafanka(recs){for(var i=0;i<recs.length;i++){var r=recs[i];var has=(r.m&&(''+r.m).trim())||(r.cmp&&(''+r.cmp).trim())||(r.src&&(''+r.src).trim())||(r.tags&&(''+r.tags).trim());if(!has)r.m='Сарафанка';}return recs;}
 function dirOf(m){const n=norm(m);if(cfg.map&&cfg.map[n]&&cfg.map[n].dir)return cfg.map[n].dir;return DIR_MAP[n]|| (m!=null&&String(m).trim()) || '(без метки)';}
 function planCity(m){const n=norm(m);return (cfg.map&&cfg.map[n]&&cfg.map[n].city)||'';}
 function guessCity(m){const n=norm(m);if(n.includes('karshym')||n.includes('kar')||n.includes('шым'))return 'Караганда/Шымкент';if(n.includes('ala')||n.includes('алмат')||n.includes('аст'))return 'Алматы/Астана';return '';}
@@ -575,7 +579,7 @@ function computeMedCity(){medCity={};const acc={};
   for(const r of DATA){const m=norm(r.m);const g=guessCityCode(r.cmp||'');if(!g)continue;(acc[m]=acc[m]||{})[g]=((acc[m]||{})[g]||0)+1;}
   for(const m in acc){medCity[m]=Object.keys(acc[m]).sort((a,b)=>acc[m][b]-acc[m][a])[0];}}
 function campPlanCity(m){const n=norm(m);const mc=cfg.map[n]&&cfg.map[n].city;return mc||medCity[n]||'';}
-function segKey(r){const base=groupDir(r);if(!reconSeg)return base;const c=campPlanCity(r.m);return base+(c?' · '+c:'');}
+function segKey(r){const base=groupDir(r);if(!reconSeg)return base;const c=dirBasis==='fact'?cityBucket(r.c):campPlanCity(r.m);return base+(c?' · '+c:'');}
 function renderRecon(){
   const rate=cfg.rate||465; computeMedCity();
   const G={},adMeds={},factMx={};
@@ -956,8 +960,8 @@ function bindMap(){
   document.querySelectorAll('#panel tr[data-k]').forEach(tr=>{
     const k=tr.getAttribute('data-k');
     const di=tr.querySelector('.mapdir'), cb=tr.querySelector('.citybtn'), ch=tr.querySelector('.rowchk');
-    di.addEventListener('change',()=>{const cur=cfg.map[k]||{};cfg.map[k]={dir:di.value.trim(),city:cur.city||''};save();setRowStatus(tr);renderKPIs();});
-    cb.addEventListener('click',e=>{e.stopPropagation();openCityPop(cb,splitCities((cfg.map[k]||{}).city),sel=>{const dir=di.value.trim();cfg.map[k]={dir,city:sel.join(', ')};cb.innerHTML=cityLabel(sel.join(', '));save();setRowStatus(tr);renderKPIs();});});
+    di.addEventListener('change',()=>{const cur=cfg.map[k]||{};cfg.map[k]={dir:di.value.trim(),city:cur.city||''};save();saveMapShared();setRowStatus(tr);renderKPIs();});
+    cb.addEventListener('click',e=>{e.stopPropagation();openCityPop(cb,splitCities((cfg.map[k]||{}).city),sel=>{const dir=di.value.trim();cfg.map[k]={dir,city:sel.join(', ')};cb.innerHTML=cityLabel(sel.join(', '));save();saveMapShared();setRowStatus(tr);renderKPIs();});});
     ch.addEventListener('change',()=>{if(ch.checked)mapSel[k]=1;else delete mapSel[k];tr.style.background=ch.checked?'var(--surface2)':'';updBulkBar();});
   });
   const search=document.getElementById('mapSearch');
@@ -972,13 +976,13 @@ function bindMap(){
     const d=document.getElementById('bulkdir').value.trim(),c=bulkCity.join(', ');
     if(!d&&!c){alert('Укажите направление и/или город для назначения.');return;}
     Object.keys(mapSel).forEach(k=>{const cur=cfg.map[k]||{};cfg.map[k]={dir:d||cur.dir||'',city:c||cur.city||''};});
-    save();renderPanel();recompute(false);
+    save();saveMapShared();renderPanel();recompute(false);
   });
   const clr=document.getElementById('bulkclear');
   if(clr)clr.addEventListener('click',()=>{mapSel={};document.querySelectorAll('#mapBody .rowchk').forEach(c=>c.checked=false);document.querySelectorAll('#mapBody tr[data-k]').forEach(tr=>tr.style.background='');updBulkBar();});
   document.querySelectorAll('#panel tr[data-pkg]').forEach(tr=>{
     const k=tr.getAttribute('data-pkg');const di=tr.querySelector('.pkgdir');
-    di.addEventListener('change',()=>{const v=di.value.trim();if(v)cfg.pkgmap[k]=v;else delete cfg.pkgmap[k];save();});
+    di.addEventListener('change',()=>{const v=di.value.trim();if(v)cfg.pkgmap[k]=v;else delete cfg.pkgmap[k];save();saveMapShared();});
   });
 }
 
@@ -997,6 +1001,7 @@ function chkRow(container, key, label, on, cls, onchange){
 
 function buildConfig(){
   const stages=distinctStages(), reasons=distinctReasons(), meds=distinctMeds();
+  DEF_QUAL_REASONS.concat(cfg.qr||[]).forEach(function(x){var n=norm(x); if(n&&!reasons[n]) reasons[n]=x;});
   const QS=new Set(cfg.qs.map(norm)),SS=new Set(cfg.ss.map(norm)),QR=new Set(cfg.qr.map(norm));
   const qc=document.getElementById('qStages');qc.innerHTML='';
   const sc=document.getElementById('sStages');sc.innerHTML='';
