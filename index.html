@@ -293,7 +293,7 @@ function planMini(fact,per){
 function planSuffix(fact,per){if(!per)return '';const pct=Math.round(fact/per*100);const gap=Math.round(per-fact);return ' · '+pct+'% плана'+(gap>0?' (−'+fmtInt(gap)+')':' ✓');}
 function clicksByGroup(keyFn){const clk={};const seen={};for(const r of DATA){const key=keyFn(r),mn=norm(r.m),kk=key+'|'+mn;if(seen[kk])continue;seen[kk]=1;const fd=fbData[mn];if(fd)clk[key]=(clk[key]||0)+fd.clicks;}return clk;}
 /* ====== Бэкенд: Google Apps Script (JSON) · страница на GitHub Pages ====== */
-const API_URL = "https://script.google.com/macros/s/AKfycbxOH5AlFbnyfE0T9jf0uaKl-29Hnu3YCPuHhH3_ULtrW86gGSfRwa4s9VHQ-l8D0Bgn/exec";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
+const API_URL = "PASTE_WEBAPP_URL";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
 function hasAPI(){ return typeof API_URL==='string' && /^https:\/\//.test(API_URL) && API_URL.indexOf('PASTE_')<0; }
 function hasGAS(){ return hasAPI(); }
 let liveData=null, liveApplied=false, manualLoaded=false;
@@ -307,8 +307,8 @@ function applyLive(d){
   if(d.error){ setSrcHtml('Ошибка API: '+d.error); resetSyncBtn(); return; }
   if(!Array.isArray(d.records)||!d.records.length){ setSrcHtml('⚠ За период данных не найдено.'); resetSyncBtn(); return; }
   manualLoaded=false; liveData=d; records=markSarafanka(d.records); resetSyncBtn();
-  if(d.fbData&&typeof d.fbData==='object'){ fbData=d.fbData; fbLoaded=true; fbCur=d.fbCur||'usd'; cfg.spend={}; }
-  if(d.payMap&&typeof d.payMap==='object'){ payMap=d.payMap; payLoaded=true; paySample=false; }
+  if(d.fbData&&typeof d.fbData==='object'){ fbData=d.fbData; fbDailyRaw=(d.fbDaily&&typeof d.fbDaily==='object')?d.fbDaily:null; fbLoaded=true; fbCur=d.fbCur||'usd'; cfg.spend={}; }
+  if(d.payMap&&typeof d.payMap==='object'){ payMapAll=d.payMap; payLoaded=true; paySample=false; }
   if(!liveApplied){ flt={preset:flt.preset||'all',from:flt.from||'',to:flt.to||'',dirs:[],cities:[],sources:[]}; }
   liveApplied=true;
   const upd=d.updatedAt?new Date(d.updatedAt).toLocaleString('ru-RU'):'';
@@ -341,11 +341,11 @@ function gasBoot(){
   apiGet({action:'data',from:r[0],to:r[1],force:0}).then(applyLive).catch(function(e){ setSrcHtml('Автозагрузка из API не удалась: '+e.message); });
 }
 let curTab='recon';
-let fbData={}, fbLoaded=false, fbCur='usd', fbName='';
+let fbData={}, fbLoaded=false, fbCur='usd', fbName='', fbDailyRaw=null;
 let reconSeg=false;
 function setReconSeg(v){reconSeg=v;renderPanel();}
-let payMap={}, payLoaded=false, payName='', paySample=true;
-PAYSAMPLE.forEach(p=>{payMap[p.id]=p;}); payLoaded=true; // демо-оплаты за 1–8 сентября
+let payMapAll={}, payMap={}, payLoaded=false, payName='', paySample=true;
+PAYSAMPLE.forEach(p=>{payMapAll[p.id]=p;}); payLoaded=true; // демо-оплаты за 1–8 сентября
 let flt={preset:'all',from:'',to:'',dirs:[],cities:[],sources:[]};
 let DATA=records.slice();
 function filtered(){
@@ -1025,7 +1025,13 @@ function toggle(arr,key,on){const i=arr.map(norm).indexOf(key);if(on){if(i<0)arr
 
 /* ---------- recompute ---------- */
 let curDays=cfg.days;
-function recompute(rebuildCfg){DATA=filtered();curDays=distinctDays(DATA)||cfg.days;renderFilterBar();renderKPIs();renderPanel();if(rebuildCfg!==false)buildConfig();}
+function applyRangeToSources(){
+  var f=flt.from, t=flt.to;
+  if(f||t){ payMap={}; for(var id in payMapAll){var p=payMapAll[id];var d=p.date||''; if(!d || ((!f||d>=f)&&(!t||d<=t))) payMap[id]=p;} }
+  else payMap=payMapAll;
+  if(fbDailyRaw){ fbData={}; for(var k in fbDailyRaw){var days=fbDailyRaw[k];var o={spend:0,impr:0,clicks:0,results:0}; for(var dd in days){ if((!f||dd>=f)&&(!t||dd<=t)){var x=days[dd]; o.spend+=(+x.spend||0); o.impr+=(+x.impr||0); o.clicks+=(+x.clicks||0);} } fbData[k]=o;} }
+}
+function recompute(rebuildCfg){applyRangeToSources();DATA=filtered();curDays=distinctDays(DATA)||cfg.days;renderFilterBar();renderKPIs();renderPanel();if(rebuildCfg!==false)buildConfig();}
 
 /* ---------- filter bar ---------- */
 function maxDate(){let mx='';for(const r of records)if(r.d&&r.d>mx)mx=r.d;return mx;}
@@ -1189,7 +1195,7 @@ document.getElementById('fbfile').addEventListener('change',ev=>{
   readTable(f,['потрачен','название кампании','amount spent','campaign name'],rows=>{
     const res=parseFb(rows);
     if(!res){alert('Не нашёл в файле колонки «Название кампании» и «Потраченная сумма». Это выгрузка Ads Manager (уровень «Кампания»)?');return;}
-    manualLoaded=true; fbData=res.map;fbCur=res.cur;fbLoaded=true;fbName=f.name;
+    manualLoaded=true; fbData=res.map;fbDailyRaw=null;fbCur=res.cur;fbLoaded=true;fbName=f.name;
     cfg.spend={}; // снять ручные оверрайды — теперь расход из FB
     let tot=0;for(const k in res.map)tot+=res.map[k].spend;
     if(res.cur==='kzt')tot=tot/(cfg.rate||465);
@@ -1231,7 +1237,7 @@ document.getElementById('payfile').addEventListener('change',ev=>{
   readTable(f,['ссылка amocrm','сумма, которую оплатили','пакет обучения','дата оплаты'],rows=>{
     const res=parsePay(rows);
     if(!res){alert('Не нашёл колонки «Ссылка AmoCRM» и «Сумма, которую оплатили». Это лист оплат?');return;}
-    manualLoaded=true; payMap=res.map;payLoaded=true;paySample=false;payName=f.name;
+    manualLoaded=true; payMapAll=res.map;payLoaded=true;paySample=false;payName=f.name;
     const ids=new Set(records.map(r=>r.id));
     let matched=0;for(const id in payMap)if(ids.has(id))matched++;
     document.getElementById('paysrc').textContent='Оплаты: '+f.name+' · '+res.n+' сделок · сошлись с текущими лидами по ID: '+matched+'. Связка «Ссылка AmoCRM» → ID сделки.';
