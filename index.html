@@ -293,7 +293,7 @@ function planMini(fact,per){
 function planSuffix(fact,per){if(!per)return '';const pct=Math.round(fact/per*100);const gap=Math.round(per-fact);return ' · '+pct+'% плана'+(gap>0?' (−'+fmtInt(gap)+')':' ✓');}
 function clicksByGroup(keyFn){const clk={};const seen={};for(const r of DATA){const key=keyFn(r),mn=norm(r.m),kk=key+'|'+mn;if(seen[kk])continue;seen[kk]=1;const fd=fbData[mn];if(fd)clk[key]=(clk[key]||0)+fd.clicks;}return clk;}
 /* ====== Бэкенд: Google Apps Script (JSON) · страница на GitHub Pages ====== */
-const API_URL = "https://script.google.com/macros/s/AKfycbxTrg-Ow9ejKnxPAz6sCVR1YI1e7xMlJ5YQGancT9lLXTB4JZd9i8FD7qncmLOgtzSI/exec";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
+const API_URL = "PASTE_WEBAPP_URL";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
 function hasAPI(){ return typeof API_URL==='string' && /^https:\/\//.test(API_URL) && API_URL.indexOf('PASTE_')<0; }
 function hasGAS(){ return hasAPI(); }
 let liveData=null, liveApplied=false, manualLoaded=false;
@@ -431,7 +431,7 @@ function aggregate(keyFn, spendByGroup){
   for(const r of DATA){
     const key=keyFn(r); if(!g[key])g[key]=blank();
     const o=g[key]; const cl=classify(r);
-    o.leads++; if(cl.qual)o.qual++; if(cl.sale)o.sale++; o.rev+=(+r.b||0); addCity(o,r);
+    o.leads++; if(cl.qual)o.qual++; if(cl.sale){o.sale++; o.rev+=(+r.b||0);} addCity(o,r);
     const mn=norm(r.m); if(!seenMed[mn]){seenMed[mn]=true;}
   }
   // spend
@@ -465,7 +465,7 @@ const dash='<span class="mut">—</span>';
 
 function renderKPIs(){
   const rate=cfg.rate||465;
-  let T=blank(); for(const r of DATA){const cl=classify(r);T.leads++;if(cl.qual)T.qual++;if(cl.sale)T.sale++;T.rev+=(+r.b||0);}
+  let T=blank(); for(const r of DATA){const cl=classify(r);T.leads++;if(cl.qual)T.qual++;if(cl.sale){T.sale++;T.rev+=(+r.b||0);}}
   const meds=new Set(DATA.map(r=>norm(r.m))); let sp=0; meds.forEach(m=>sp+=spendOf(m)); T.spend=sp;
   const M=metrics(T,rate);
   const days=distinctDays(DATA)||cfg.days||1;
@@ -666,7 +666,7 @@ function renderRecon(){
   return funnel+matrix+factMatrix+cityMatrix+cityTbl+lag;
 }
 
-function valOf(r,metric){if(metric==='leads')return 1;const cl=classify(r);if(metric==='qual')return cl.qual?1:0;if(metric==='sale')return cl.sale?1:0;if(metric==='rev')return +r.b||0;return 0;}
+function valOf(r,metric){if(metric==='leads')return 1;const cl=classify(r);if(metric==='qual')return cl.qual?1:0;if(metric==='sale')return cl.sale?1:0;if(metric==='rev')return cl.sale?(+r.b||0):0;return 0;}
 function renderDays(){
   const dg=aggregate(r=>groupDir(r),'dir');
   const dirs=Object.keys(dg).sort((a,b)=>dg[b].leads-dg[a].leads);
