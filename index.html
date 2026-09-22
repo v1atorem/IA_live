@@ -293,7 +293,7 @@ function planMini(fact,per){
 function planSuffix(fact,per){if(!per)return '';const pct=Math.round(fact/per*100);const gap=Math.round(per-fact);return ' · '+pct+'% плана'+(gap>0?' (−'+fmtInt(gap)+')':' ✓');}
 function clicksByGroup(keyFn){const clk={};const seen={};for(const r of DATA){const key=keyFn(r),mn=norm(r.m),kk=key+'|'+mn;if(seen[kk])continue;seen[kk]=1;const fd=fbData[mn];if(fd)clk[key]=(clk[key]||0)+fd.clicks;}return clk;}
 /* ====== Бэкенд: Google Apps Script (JSON) · страница на GitHub Pages ====== */
-const API_URL = "https://script.google.com/macros/s/AKfycbwWwgllFZGvvWDvoMFNE8_T2KJn2QLSEhgLHiZs3XFv_CroyyD-VaKghiqDlcuhxiGf/exec";  
+const API_URL = "https://script.google.com/macros/s/AKfycbwWwgllFZGvvWDvoMFNE8_T2KJn2QLSEhgLHiZs3XFv_CroyyD-VaKghiqDlcuhxiGf/exec";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
 function hasAPI(){ return typeof API_URL==='string' && /^https:\/\//.test(API_URL) && API_URL.indexOf('PASTE_')<0; }
 function hasGAS(){ return hasAPI(); }
 let liveData=null, liveApplied=false, manualLoaded=false;
@@ -318,7 +318,7 @@ function applyLive(d){
   const pays=document.getElementById('paysrc'); if(pays&&d.payMap)pays.textContent='Оплаты — из API · '+Object.keys(d.payMap).length+' сделок (связка по ID сделки).';
   recompute();
 }
-function rangeOrDefault(){let from=flt.from,to=flt.to; if(!from||!to){to=new Date().toISOString().slice(0,10);from=shiftDays(to,-59);} return [from,to];}
+function rangeOrDefault(){let from=flt.from,to=flt.to; if(!from||!to){to=new Date().toISOString().slice(0,10);from=to.slice(0,8)+'01';} return [from,to];}
 function requestSync(){
   if(!hasAPI()){alert('Не задан URL бэкенда. Впиши URL веб-приложения Apps Script в API_URL вверху файла.');return;}
   const r=rangeOrDefault(),from=r[0],to=r[1];
@@ -438,11 +438,10 @@ function aggregate(keyFn, spendByGroup){
   }
   // spend
   if(spendByGroup==='med'){ for(const k in g) g[k].spend=spendOf(norm(k)); }
-  else { // sum spend of mediums belonging to each direction
-    const bymed={}; for(const r of DATA){const mn=norm(r.m); if(!(mn in bymed))bymed[mn]=spendOf(mn);}
-    // avoid double counting: sum unique mediums per dir
-    const dirMeds={}; for(const r of DATA){const d=keyFn(r),mn=norm(r.m);(dirMeds[d]=dirMeds[d]||new Set()).add(mn);}
-    for(const d in g){let s=0;dirMeds[d].forEach(mn=>s+=bymed[mn]);g[d].spend=s;}
+  else { // расход медиума делим между группами пропорц. доле лидов (город/факт не задваивают)
+    const ml={}; for(const r of DATA){const mn=norm(r.m),dk=keyFn(r);(ml[mn]=ml[mn]||{_t:0});ml[mn][dk]=(ml[mn][dk]||0)+1;ml[mn]._t++;}
+    for(const d in g) g[d].spend=0;
+    for(const mn in ml){const sp=spendOf(mn),t=ml[mn]._t;if(!t)continue;for(const dk in ml[mn]){if(dk==='_t')continue;if(g[dk])g[dk].spend+=sp*ml[mn][dk]/t;}}
   }
   return g;
 }
@@ -593,8 +592,9 @@ function renderRecon(){
     const pay=payOf(r.id);
     if(pay){g.paid++;g.rev+=pay.paid;const sd=pkgDir(pay.pkg);const s=g.sold[sd]||(g.sold[sd]={deals:0,rev:0});s.deals++;s.rev+=pay.paid;}
   }
-  const bymed={};for(const r of DATA){const mn=norm(r.m);if(!(mn in bymed))bymed[mn]=spendOf(mn);}
-  for(const d in G){let s=0;adMeds[d].forEach(mn=>s+=bymed[mn]);G[d].spend=s;}
+  const mlR={};for(const r of DATA){const mn=norm(r.m),dk=segKey(r);(mlR[mn]=mlR[mn]||{_t:0});mlR[mn][dk]=(mlR[mn][dk]||0)+1;mlR[mn]._t++;}
+  for(const d in G)G[d].spend=0;
+  for(const mn in mlR){const sp=spendOf(mn),t=mlR[mn]._t;if(!t)continue;for(const dk in mlR[mn]){if(dk==='_t')continue;if(G[dk])G[dk].spend+=sp*mlR[mn][dk]/t;}}
   // funnel table
   const clk=clicksByGroup(segKey);
   const showPlan=!reconSeg&&hasPlan();
