@@ -496,7 +496,7 @@ function renderKPIs(){
     tiles.push(['Конв. сайта',conv==null?'—':fmtPct(conv),'лиды / клики','hi']);
   }
   if(payLoaded){
-    let paid=0,prev=0; for(const r of DATA){const p=payOf(r.id);if(p){paid++;prev+=p.paid;}}
+    let paid=0,prev=0; for(const id in payMap){paid++;prev+=(+payMap[id].paid||0);} // все оплаты периода по дате оплаты; ID — только уникальность, привязка к лидам амо не нужна
     tiles.push(['Оплачено (факт)',fmtKzt(prev),paid+' сделок'+(paySample?' · пример':''),'goodv']);
   }
   document.getElementById('kpis').innerHTML=tiles.map(t=>{
