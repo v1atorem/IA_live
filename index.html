@@ -293,7 +293,7 @@ function planMini(fact,per){
 function planSuffix(fact,per){if(!per)return '';const pct=Math.round(fact/per*100);const gap=Math.round(per-fact);return ' · '+pct+'% плана'+(gap>0?' (−'+fmtInt(gap)+')':' ✓');}
 function clicksByGroup(keyFn){const clk={};const seen={};for(const r of DATA){const key=keyFn(r),mn=norm(r.m),kk=key+'|'+mn;if(seen[kk])continue;seen[kk]=1;const fd=fbData[mn];if(fd)clk[key]=(clk[key]||0)+fd.clicks;}return clk;}
 /* ====== Бэкенд: Google Apps Script (JSON) · страница на GitHub Pages ====== */
-const API_URL = "https://script.google.com/macros/s/AKfycbxTrg-Ow9ejKnxPAz6sCVR1YI1e7xMlJ5YQGancT9lLXTB4JZd9i8FD7qncmLOgtzSI/exec";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
+const API_URL = "PASTE_WEBAPP_URL";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
 function hasAPI(){ return typeof API_URL==='string' && /^https:\/\//.test(API_URL) && API_URL.indexOf('PASTE_')<0; }
 function hasGAS(){ return hasAPI(); }
 let liveData=null, liveApplied=false, manualLoaded=false;
@@ -379,7 +379,9 @@ function pkgList(){const s={};for(const id in payMap){const p=(payMap[id].pkg||'
 function formDir(fn){const n=norm(fn);if(!n)return '';if(n.includes('tzkz')||(n.includes('tz')&&n.includes('kz')))return 'ТЗ_каз';if(n.includes('выпускник')||n.includes('cbplus')||n.includes('будь как'))return 'Bust_plus';if(n.includes('tz'))return 'ТЗ';if(n.includes('quiz')||n.includes('popupinvictus'))return 'ГП';return '';}
 function factDir(r){const c=pkgDir(r.crs||'');if((r.crs||'').trim()&&c&&c!=='(?)')return c;const f=formDir(r.fn||'');if(f)return f;return dirOf(r.m);}
 let dirBasis='ad';
-function groupDir(r){return dirBasis==='fact'?factDir(r):dirOf(r.m);}
+let cityBreak=false;
+function setCityBreak(v){cityBreak=v;flt.dirs=[];recompute();}
+function groupDir(r){var base=dirBasis==='fact'?factDir(r):dirOf(r.m);return cityBreak?base+' · '+cityBucket(r.c):base;}
 function setDirBasis(v){dirBasis=v;flt.dirs=[];recompute();}
 function guessCityCode(cmp){const n=norm(cmp);if(!n)return '';
   if((n.includes('kar')&&n.includes('shym')))return 'Караганда/Шымкент';
@@ -579,7 +581,7 @@ function computeMedCity(){medCity={};const acc={};
   for(const r of DATA){const m=norm(r.m);const g=guessCityCode(r.cmp||'');if(!g)continue;(acc[m]=acc[m]||{})[g]=((acc[m]||{})[g]||0)+1;}
   for(const m in acc){medCity[m]=Object.keys(acc[m]).sort((a,b)=>acc[m][b]-acc[m][a])[0];}}
 function campPlanCity(m){const n=norm(m);const mc=cfg.map[n]&&cfg.map[n].city;return mc||medCity[n]||'';}
-function segKey(r){const base=groupDir(r);if(!reconSeg)return base;const c=dirBasis==='fact'?cityBucket(r.c):campPlanCity(r.m);return base+(c?' · '+c:'');}
+function segKey(r){const base=groupDir(r);if(!reconSeg||cityBreak)return base;const c=dirBasis==='fact'?cityBucket(r.c):campPlanCity(r.m);return base+(c?' · '+c:'');}
 function renderRecon(){
   const rate=cfg.rate||465; computeMedCity();
   const G={},adMeds={},factMx={};
@@ -1090,12 +1092,14 @@ function renderFilterBar(){
   const dates='<input type="date" class="dateinp" id="fFrom" value="'+(flt.from||'')+'"><span class="mut">–</span><input type="date" class="dateinp" id="fTo" value="'+(flt.to||'')+'">';
   const pill=(f,lbl)=>'<div class="msel" data-f="'+f+'"><button class="pill-btn'+(flt[f].length?' act':'')+'">'+lbl+' <span class="cnt"'+(flt[f].length?'':' hidden')+'>'+(flt[f].length||'')+'</span> ▾</button></div>';
   const basis='<div class="seg" id="basisSeg"><button data-bs="ad" class="'+(dirBasis==='ad'?'on':'')+'">Рекл.</button><button data-bs="fact" class="'+(dirBasis==='fact'?'on':'')+'">Факт (amo)</button></div>';
+  const citybreak='<div class="seg" id="cbSeg" title="Разбить направления по фактическому городу (amoCRM)"><button class="'+(cityBreak?'on':'')+'">➕ города</button></div>';
   bar.innerHTML='<span class="flabel">Период</span>'+seg+dates+
-    '<span class="flabel" style="margin-left:6px">Напр.</span>'+basis+
+    '<span class="flabel" style="margin-left:6px">Напр.</span>'+basis+citybreak+
     '<span class="flabel" style="margin-left:6px">Фильтры</span>'+pill('dirs','Направление')+pill('cities','Город (факт)')+pill('sources','Источник')+
     '<div class="fspacer"></div><span class="fsum" id="fsum"></span><span class="flink" id="freset"'+(activeFilterCount()?'':' hidden')+'>Сбросить всё</span>';
   bar.querySelectorAll('.seg button[data-p]').forEach(b=>b.addEventListener('click',()=>setPreset(b.getAttribute('data-p'))));
   bar.querySelectorAll('#basisSeg button').forEach(b=>b.addEventListener('click',()=>setDirBasis(b.getAttribute('data-bs'))));
+  bar.querySelectorAll('#cbSeg button').forEach(b=>b.addEventListener('click',()=>setCityBreak(!cityBreak)));
   bar.querySelector('#fFrom').addEventListener('change',e=>{flt.from=e.target.value;flt.preset='custom';applyOnly();markPreset();});
   bar.querySelector('#fTo').addEventListener('change',e=>{flt.to=e.target.value;flt.preset='custom';applyOnly();markPreset();});
   bar.querySelectorAll('.msel').forEach(ms=>{ms.querySelector('.pill-btn').addEventListener('click',e=>{e.stopPropagation();openPop(ms,ms.getAttribute('data-f'));});});
