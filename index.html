@@ -293,14 +293,23 @@ function planMini(fact,per){
 function planSuffix(fact,per){if(!per)return '';const pct=Math.round(fact/per*100);const gap=Math.round(per-fact);return ' · '+pct+'% плана'+(gap>0?' (−'+fmtInt(gap)+')':' ✓');}
 function clicksByGroup(keyFn){const clk={};const seen={};for(const r of DATA){const key=keyFn(r),mn=norm(r.m),kk=key+'|'+mn;if(seen[kk])continue;seen[kk]=1;const fd=fbData[mn];if(fd)clk[key]=(clk[key]||0)+fd.clicks;}return clk;}
 /* ====== Бэкенд: Google Apps Script (JSON) · страница на GitHub Pages ====== */
-const API_URL = "https://script.google.com/macros/s/AKfycbwUke_wHCCWAMcCCxScWpFq4JuKc0CT2BTrXov_4Bq3-988HGHB7RuL3sP4lgMBf3MC/exec";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
+const API_URL = "https://script.google.com/macros/s/AKfycbx5V85ZvmBLvTGX423sEct3QlZDG1MWjBmjt6_eB7Qi8SMfalnoXrCTOXney6dG0mwx/exec";   /* ← ВСТАВЬ СЮДА URL веб-приложения Apps Script, оканчивается на /exec */
 function hasAPI(){ return typeof API_URL==='string' && /^https:\/\//.test(API_URL) && API_URL.indexOf('PASTE_')<0; }
 function hasGAS(){ return hasAPI(); }
 let liveData=null, liveApplied=false, manualLoaded=false;
 function setSrcHtml(html){const s=document.getElementById('src');if(s)s.innerHTML=html;}
 function resetSyncBtn(){const b=document.getElementById('apiSync');if(b){b.disabled=false;b.textContent='🔄 Обновить из API';}}
-function apiGet(params){ const q=Object.keys(params).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
-  return fetch(API_URL+(API_URL.indexOf('?')<0?'?':'&')+q,{method:'GET'}).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }); }
+function apiGet(params){ return new Promise(function(resolve,reject){
+  var cb='__cb'+(apiGet._n=(apiGet._n||0)+1)+'_'+Date.now();
+  var s=document.createElement('script'); var done=false;
+  var to=setTimeout(function(){ if(done)return; done=true; cleanup(); reject(new Error('timeout')); }, 190000);
+  function cleanup(){ try{delete window[cb];}catch(e){try{window[cb]=undefined;}catch(_){} } if(s&&s.parentNode)s.parentNode.removeChild(s); clearTimeout(to); }
+  window[cb]=function(data){ if(done)return; done=true; cleanup(); resolve(data); };
+  var q=Object.keys(params).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
+  s.src=API_URL+(API_URL.indexOf('?')<0?'?':'&')+q+'&callback='+cb;
+  s.onerror=function(){ if(done)return; done=true; cleanup(); reject(new Error('не удалось подключиться к API (проверь URL и доступ «Anyone»)')); };
+  document.body.appendChild(s);
+}); }
 function applyLive(d){
   if(!d) return;
   if(typeof d==='string'){try{d=JSON.parse(d);}catch(e){return;}}
