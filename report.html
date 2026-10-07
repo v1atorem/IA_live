@@ -810,7 +810,7 @@ function renderCre(A){
   document.querySelectorAll('#creTop .chip').forEach(b=>b.classList.toggle('on',+b.dataset.t===+CRE.top));
   document.getElementById('creSort').value=CRE.sort;
   const D=creData(A);A.cre=D;
-  if(!D){el.innerHTML='<div class="empty">'+(MANUAL?'Для креативов нужны данные из API — при ручной загрузке файлов раздел недоступен.':FBADS_ERR?'Facebook не отдал данные по объявлениям: '+esc(FBADS_ERR):'Скрипт пока не отдаёт данные по объявлениям. Обновите Code.gs в Apps Script, сделайте новую версию развертывания и нажмите «Свежие данные».')+'</div>';note.textContent='';renderSites(A,null);return;}
+  if(!D){el.innerHTML='<div class="empty">'+(MANUAL?'Для креативов нужны данные из API — при ручной загрузке файлов раздел недоступен.':FBADS_ERR?'Facebook не отдал данные по объявлениям: '+esc(FBADS_ERR):!WIN?'Данные из API не загрузились (см. сообщение вверху), поэтому креативов нет.':'В ответе скрипта нет данных по объявлениям. Либо в Apps Script ещё старый код / старая версия развертывания, либо ответ взят из кэша скрипта (он живёт 6 часов) — нажмите «Свежие данные».')+'</div>';note.textContent='';renderSites(A,null);return;}
   const H='<table><thead><tr><th class="l">'+(CRE.view==='tree'?'Кампания / группа / объявление':'Объявление')+'</th><th class="l">Крео</th><th>Расход</th><th>Клики</th><th>CTR</th><th>Клик→лид</th><th>Лиды</th><th>CPL</th><th>Квалы</th><th>%квал</th><th>CPQL</th><th>Продажи</th><th>CAC</th><th>Выручка, млн ₸</th><th>Оплаты, млн ₸</th><th>ROMI</th><th>ROMI общ.</th></tr></thead><tbody>';
   const cmps=Object.values(D.cmps).filter(c=>CRE.dir==='all'||c.dir===CRE.dir);
   const by=(a,b)=>creSortVal(b.M)-creSortVal(a.M);
@@ -856,7 +856,7 @@ function renderSites(A,D){
   if(D)for(const k in D.ads){const o=D.ads[k];let b='',bn=0,tot=0;for(const st in o.sites){tot+=o.sites[st];fbLeadSites[st]=(fbLeadSites[st]||0)+o.sites[st];if(o.sites[st]>bn){bn=o.sites[st];b=st;}}
     if(b&&bn/tot>=0.5)(auto[b]=auto[b]||[]).push(o);}
   const names=[...new Set(Object.keys(leadSites).concat(Object.keys(SITES)))].sort((a,b)=>(leadSites[b]||0)-(leadSites[a]||0));
-  if(!names.length){el.innerHTML='<div class="empty">За период нет лидов с заполненным referer. Добавьте сайт вручную и назначьте ему кампании.</div>';A.sites=[];return;}
+  if(!names.length){el.innerHTML='<div class="empty">'+(A.R.length?'За период нет лидов с заполненным полем referer. Добавьте сайт вручную и назначьте ему кампании.':'Нет лидов за период.')+'</div>';A.sites=[];return;}
   let opts='<option value="">＋ назначить…</option>';
   if(D)for(const c of Object.values(D.cmps).sort((a,b)=>b.M.spend-a.M.spend)){opts+='<optgroup label="'+esc(c.name)+'"><option value="'+esc(c.key)+'">Вся кампания</option>';
     for(const S of Object.values(c.sets)){opts+='<option value="'+esc(S.key)+'">— группа: '+esc(S.name)+'</option>';for(const o of S.ads)if(o.id)opts+='<option value="'+esc(o.key)+'">—— '+esc(o.n)+'</option>';}
