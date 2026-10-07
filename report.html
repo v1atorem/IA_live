@@ -260,7 +260,11 @@ function apiGet(params,timeoutMs){return new Promise((resolve,reject)=>{
   function cleanup(){try{delete window[cb];}catch(e){window[cb]=undefined;}if(s.parentNode)s.parentNode.removeChild(s);clearTimeout(to);}
   window[cb]=d=>{if(done)return;done=true;cleanup();if(typeof d==='string'){try{d=JSON.parse(d);}catch(e){}}resolve(d);};
   s.src=API_URL+'?'+Object.keys(params).map(k=>k+'='+encodeURIComponent(params[k])).join('&')+'&callback='+cb;
-  s.onerror=()=>{if(done)return;done=true;cleanup();reject(new Error('не удалось подключиться к API'));};
+  s.onerror=()=>{if(done)return;done=true;cleanup();
+    /* запасной путь: обычный fetch (Apps Script отдаёт JSON с CORS) */
+    const u=API_URL+'?'+Object.keys(params).map(k=>k+'='+encodeURIComponent(params[k])).join('&');
+    fetch(u,{redirect:'follow'}).then(r=>r.text()).then(t=>{let d;try{d=JSON.parse(t);}catch(e){throw new Error('скрипт вернул не данные, а страницу ('+t.slice(0,80).replace(/<[^>]+>/g,' ').trim()+')');}if(typeof d==='string'){try{d=JSON.parse(d);}catch(e){}}resolve(d);})
+      .catch(e=>reject(new Error('не удалось подключиться к API (адрес …'+API_URL.split('/s/')[1].slice(0,10)+'…, запрос '+(params.action||'')+'): '+(e&&e.message||e))));};
   document.body.appendChild(s);});}
 
 /* ===== правила классификации (как в «Разбор направлений») ===== */
