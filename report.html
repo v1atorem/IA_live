@@ -98,6 +98,9 @@ tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-tr
 .chart{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 12px 6px;overflow-x:auto}
 .chart svg{display:block;min-width:520px;max-width:none}
 .chart text{font-family:var(--f-body);font-size:11px;fill:var(--muted)}
+.pin{width:84px;padding:5px 7px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--ink);font:500 13.5px var(--f-body);text-align:right;font-variant-numeric:tabular-nums}
+.pin::placeholder{color:var(--muted);opacity:.8}
+.pin:focus{border-color:var(--plan);outline:none}
 .empty{padding:28px;text-align:center;color:var(--muted)}
 </style>
 
@@ -292,6 +295,12 @@ function fbForRange(from,to){
 /* ===== расчёт ===== */
 function blank(){return {leads:0,qual:0,sale:0,rev:0,spend:0,clicks:0};}
 function metr(o,rate){return {...o,qpct:o.leads?o.qual/o.leads*100:0,spct:o.qual?o.sale/o.qual*100:0,cpl:o.spend>0&&o.leads?o.spend/o.leads:null,cpql:o.spend>0&&o.qual?o.spend/o.qual:null,cac:o.spend>0&&o.sale?o.spend/o.sale:null,romi:o.spend>0?((o.rev/rate)-o.spend)/o.spend*100:null,conv:o.clicks?o.leads/o.clicks*100:null};}
+function planMonth(){return (ST.from||todayISO()).slice(0,7);}
+function cityPlans(){return store.get('ia_cityplan',{});}
+function getCityPlan(month,key){const all=cityPlans();if(all[month]&&all[month][key])return all[month][key];
+  const ms=Object.keys(all).filter(m=>m<month&&all[m][key]).sort();return ms.length?all[ms[ms.length-1]][key]:null;}
+function setCityPlan(month,key,field,val){const all=cityPlans();const cur=getCityPlan(month,key)||{};all[month]=all[month]||{};
+  all[month][key]=Object.assign({p1:cur.p1||null,p2:cur.p2||null},all[month][key]||{});all[month][key][field]=val>0?val:null;store.set('ia_cityplan',all);}
 function planDays(from,to){let s=0;for(let d=from;d<=to;d=addDays(d,1))s+=1/daysInMonth(d);return s;} /* в «месяцах» */
 
 function compute(){
@@ -332,14 +341,35 @@ function compute(){
   const sum=(arr,f)=>arr.reduce((s,x)=>s+f(x),0);
   const tot=blank(),paid=blank();
   for(const x of dirs){for(const f of ['leads','qual','sale','rev','spend','clicks']){tot[f]+=x.M[f];if(x.paid)paid[f]+=x.M[f];}}
-  /* города: только платные направления, без «Без города», доля ≥15% лидов направления (по всем данным) */
+  /* города: строки по платным направлениям. Город — если он задаёт таргет (≥15% лидов направления),
+     иначе одна строка «все города». Остаток — строка «другие города / без города». */
   const paidDirs=dirs.filter(x=>x.paid).map(x=>x.k);
+  const NAMED=['Алматы','Астана','Караганда','Шымкент'];
+  const mkey=planMonth();
   const cityRows=[];
+  const agg=(d,buckets)=>{const o=blank();for(const b of buckets){const c=cityG[d+'|'+b];if(c)for(const f of ['leads','qual','sale','rev','spend','clicks'])o[f]+=c[f];}return o;};
   for(const d of paidDirs){
-    const cand=Object.keys(baseCity).filter(k=>k.startsWith(d+'|')&&!k.endsWith('|Без города')&&baseCity[k]>=20&&baseCity[k]/(baseDir[d]||1)>=0.15);
-    cand.sort((a,b)=>baseCity[b]-baseCity[a]);
-    for(const ck of cand){const o=cityG[ck]||blank();const cityShare=baseCity[ck]/(baseDir[d]||1);const dx=dirs.find(x=>x.k===d);
-      cityRows.push({k:d+' · '+ck.split('|')[1],M:metr(o,rate),cityShare,p1:dx.p1*cityShare,p2:dx.p2*cityShare});}
+    if((baseDir[d]||0)<10)continue;
+    const dx=dirs.find(x=>x.k===d),bd=baseDir[d]||1;
+    const allB=Object.keys(cityG).filter(k=>k.startsWith(d+'|')).map(k=>k.split('|')[1]).concat(Object.keys(baseCity).filter(k=>k.startsWith(d+'|')).map(k=>k.split('|')[1]));
+    const buckets=[...new Set(allB)];
+    let cand=NAMED.filter(c=>(baseCity[d+'|'+c]||0)>=10&&(baseCity[d+'|'+c]||0)/bd>=0.15).sort((a,b)=>(baseCity[d+'|'+b]||0)-(baseCity[d+'|'+a]||0));
+    const covered=cand.reduce((s,c)=>s+(baseCity[d+'|'+c]||0),0)/bd;
+    const groups=[];
+    if(!cand.length||covered<0.5) groups.push({label:'все города',buckets,share:1});
+    else{for(const c of cand)groups.push({label:c,buckets:[c],share:(baseCity[d+'|'+c]||0)/bd});
+      const rest=buckets.filter(b=>!cand.includes(b));const rs=rest.reduce((s,b)=>s+(baseCity[d+'|'+b]||0),0)/bd;
+      if(rest.length&&(rs>0||agg(d,rest).leads>0))groups.push({label:'другие города / без города',buckets:rest,share:rs});}
+    let dp1=0,dp2=0;
+    for(const g of groups){
+      const key=d+'|'+g.label, man=getCityPlan(mkey,key);
+      const a1=ST.p1*dx.share*g.share, a2=ST.p2*dx.share*g.share; /* авто, в месяц */
+      const m1=man&&man.p1>0?man.p1:null, m2=man&&man.p2>0?man.p2:null;
+      const p1=(m1!=null?m1:a1)*months, p2=(m2!=null?m2:a2)*months;
+      dp1+=p1;dp2+=p2;
+      cityRows.push({k:d+' · '+g.label,key,dir:d,M:metr(agg(d,g.buckets),rate),cityShare:g.share,auto1:a1,auto2:a2,man1:m1,man2:m2,p1,p2});
+    }
+    dx.p1=dp1;dx.p2=dp2; /* план направления = сумма строк */
   }
   /* утечка */
   const leakRows=[...paidDirs];const otherLbl='Органика, social, сарафанка, прочее';
@@ -402,15 +432,28 @@ function renderCity(A){
   document.getElementById('tCity').innerHTML=h+'</tbody></table>';
 }
 function renderPlan(A){
-  document.getElementById('planLead').textContent='Месячный план '+fI(A.p1)+' (План 1) и '+fI(A.p2)+' (План 2) делится по направлениям и городам пропорционально их доле лидов во всей загруженной выгрузке, затем умножается на долю месяца в периоде ('+A.days+' дн.).';
+  const mk=planMonth();
+  document.getElementById('planLead').innerHTML='Впишите месячный план по каждой строке — он сохранится для <b>'+mk.slice(5,7)+'.'+mk.slice(0,4)+'</b> и следующих месяцев, пока не поменяете. Пустая ячейка = авто: общий план '+fI(A.p1)+' / '+fI(A.p2)+' × доля строки в лидах. План периода = месячный × '+A.days+' дн. / дни месяца. План направления в таблице выше = сумма его строк.';
   if(!A.cityRows.length){document.getElementById('tPlan').innerHTML='<div class="empty">Нет данных</div>';return;}
-  let h='<table><thead><tr><th class="l">Направление · город</th><th>Факт</th><th class="pl">План 1</th><th class="pl">План 1 / день</th><th class="pl">% плана 1</th><th>Откл.</th><th class="pl">План 2</th><th class="pl">План 2 / день</th><th class="pl">% плана 2</th><th>Откл.</th></tr></thead><tbody>';
-  let F=0,P1=0,P2=0;
-  for(const x of A.cityRows){F+=x.M.leads;P1+=x.p1;P2+=x.p2;
-    h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(x.M.leads)+'</td><td>'+fI(x.p1)+'</td><td>'+(x.p1/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(x.M.leads,x.p1)+'</td><td>'+dev(x.M.leads,x.p1)+'</td><td>'+fI(x.p2)+'</td><td>'+(x.p2/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(x.M.leads,x.p2)+'</td><td>'+dev(x.M.leads,x.p2)+'</td></tr>';}
-  h+='<tr class="total"><td class="l">Итого по этим городам</td><td>'+fI(F)+'</td><td>'+fI(P1)+'</td><td>'+(P1/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P1)+'</td><td>'+dev(F,P1)+'</td><td>'+fI(P2)+'</td><td>'+(P2/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P2)+'</td><td>'+dev(F,P2)+'</td></tr>';
-  document.getElementById('tPlan').innerHTML=h+'</tbody></table><p class="note" style="padding:8px 12px">Остальные лиды (другие города, директ, органика, прочие каналы) входят в общий план, но в эту таблицу не попадают.</p>';
+  const inp=(x,f,man,auto)=>'<input class="pin" type="number" min="0" step="1" inputmode="numeric" data-key="'+esc(x.key)+'" data-f="'+f+'" value="'+(man!=null?Math.round(man):'')+'" placeholder="'+Math.round(auto)+'" aria-label="'+esc(x.k)+' — План '+(f==='p1'?1:2)+' в месяц">';
+  let h='<table><thead><tr><th class="l">Направление · город</th><th class="pl">План 1 / мес</th><th class="pl">План 2 / мес</th><th>Факт</th><th class="pl">План 1</th><th class="pl">/ день</th><th class="pl">% плана 1</th><th>Откл.</th><th class="pl">План 2</th><th class="pl">/ день</th><th class="pl">% плана 2</th><th>Откл.</th></tr></thead><tbody>';
+  let F=0,P1=0,P2=0,M1=0,M2=0,cur='';
+  const sub={};
+  for(const x of A.cityRows){F+=x.M.leads;P1+=x.p1;P2+=x.p2;M1+=x.man1!=null?x.man1:x.auto1;M2+=x.man2!=null?x.man2:x.auto2;
+    if(x.dir!==cur){cur=x.dir;h+='<tr class="grp"><td colspan="12">'+esc(x.dir)+'</td></tr>';}
+    h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+inp(x,'p1',x.man1,x.auto1)+'</td><td>'+inp(x,'p2',x.man2,x.auto2)+'</td><td>'+fI(x.M.leads)+'</td><td>'+fI(x.p1)+'</td><td>'+(x.p1/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(x.M.leads,x.p1)+'</td><td>'+dev(x.M.leads,x.p1)+'</td><td>'+fI(x.p2)+'</td><td>'+(x.p2/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(x.M.leads,x.p2)+'</td><td>'+dev(x.M.leads,x.p2)+'</td></tr>';}
+  h+='<tr class="total"><td class="l">Итого платные направления</td><td>'+fI(M1)+'</td><td>'+fI(M2)+'</td><td>'+fI(F)+'</td><td>'+fI(P1)+'</td><td>'+(P1/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P1)+'</td><td>'+dev(F,P1)+'</td><td>'+fI(P2)+'</td><td>'+(P2/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P2)+'</td><td>'+dev(F,P2)+'</td></tr>';
+  const anyMan=A.cityRows.some(x=>x.man1!=null||x.man2!=null);
+  document.getElementById('tPlan').innerHTML=h+'</tbody></table><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px"><p class="note" style="margin:0">Директ, органика и прочие каналы без расхода в эту таблицу не входят — их план считается авто от общего. Планы хранятся в этом браузере.</p>'+(anyMan?'<button class="btn" id="bResetPlan">Сбросить ручные планы за '+mk.slice(5,7)+'.'+mk.slice(0,4)+'</button>':'')+'</div>';
 }
+document.getElementById('tPlan').addEventListener('change',e=>{const t=e.target;if(!t.classList||!t.classList.contains('pin'))return;
+  const v=parseFloat(String(t.value).replace(',','.'));setCityPlan(planMonth(),t.dataset.key,t.dataset.f,v>0?v:null);
+  setTimeout(()=>{const ae=document.activeElement;const fk=ae&&ae.classList&&ae.classList.contains('pin')?[ae.dataset.key,ae.dataset.f]:null;
+    const sy=window.scrollY;render();window.scrollTo(0,sy);
+    if(fk){const nx=document.querySelector('.pin[data-key="'+CSS.escape(fk[0])+'"][data-f="'+fk[1]+'"]');if(nx){nx.focus();nx.select&&nx.select();}}},0);});
+document.getElementById('tPlan').addEventListener('click',e=>{if(e.target.id!=='bResetPlan')return;const all=cityPlans();const mk=planMonth();
+  /* сбросить = записать пустые значения на этот месяц, чтобы не подтягивались прошлые */
+  all[mk]={};for(const x of (LAST?LAST.cityRows:[]))all[mk][x.key]={p1:null,p2:null};store.set('ia_cityplan',all);render();});
 function renderChart(A){
   const days=[];for(let d=A.from;d<=A.to;d=addDays(d,1))days.push(d);
   if(days.length>120){document.getElementById('chart').innerHTML='<div class="empty">Период длиннее 120 дней — график скрыт</div>';return;}
@@ -526,9 +569,9 @@ function buildWorkbook(){
   const c=[['Направление × город · '+per],['Направление · город','Лиды','Квал','%квал','Продажи','%кв→прод','Расход $','CPL $','CPQL $','CAC $','Выручка ₸','ROMI %']];
   for(const x of A.cityRows){const M=x.M;c.push([x.k,M.leads,M.qual,r1(M.qpct),M.sale,r1(M.spct),r2(M.spend),r2(M.cpl),r2(M.cpql),r2(M.cac),Math.round(M.rev),r1(M.romi)]);}
   c.push([],['Расход кампании делится между городами пропорционально лидам.']);add('Города',c,[30].concat(Array(11).fill(11)));
-  const p=[['План по лидам: направление × город · '+per],['Направление · город','Факт','Доля города в направлении %','План 1','План 1 / день','% плана 1','Откл. 1','План 2','План 2 / день','% плана 2','Откл. 2']];
-  let F=0,P1=0,P2=0;for(const x of A.cityRows){F+=x.M.leads;P1+=x.p1;P2+=x.p2;p.push([x.k,x.M.leads,r1(x.cityShare*100),Math.round(x.p1),r1(x.p1/A.days),x.p1?Math.round(x.M.leads/x.p1*100):'',Math.round(x.M.leads-x.p1),Math.round(x.p2),r1(x.p2/A.days),x.p2?Math.round(x.M.leads/x.p2*100):'',Math.round(x.M.leads-x.p2)]);}
-  p.push(['Итого по этим городам',F,'',Math.round(P1),r1(P1/A.days),P1?Math.round(F/P1*100):'',Math.round(F-P1),Math.round(P2),r1(P2/A.days),P2?Math.round(F/P2*100):'',Math.round(F-P2)]);
+  const p=[['План по лидам: направление × город · '+per],['Направление · город','План 1 / мес','План 2 / мес','Источник плана','Факт','План 1','План 1 / день','% плана 1','Откл. 1','План 2','План 2 / день','% плана 2','Откл. 2']];
+  let F=0,P1=0,P2=0;for(const x of A.cityRows){F+=x.M.leads;P1+=x.p1;P2+=x.p2;p.push([x.k,Math.round(x.man1!=null?x.man1:x.auto1),Math.round(x.man2!=null?x.man2:x.auto2),(x.man1!=null||x.man2!=null)?'вручную':'авто',x.M.leads,Math.round(x.p1),r1(x.p1/A.days),x.p1?Math.round(x.M.leads/x.p1*100):'',Math.round(x.M.leads-x.p1),Math.round(x.p2),r1(x.p2/A.days),x.p2?Math.round(x.M.leads/x.p2*100):'',Math.round(x.M.leads-x.p2)]);}
+  p.push(['Итого платные направления','','','',F,Math.round(P1),r1(P1/A.days),P1?Math.round(F/P1*100):'',Math.round(F-P1),Math.round(P2),r1(P2/A.days),P2?Math.round(F/P2*100):'',Math.round(F-P2)]);
   add('План по городам',p,[30].concat(Array(10).fill(12)));
   const l=[['Что рекламировали → что продали · '+per],['Реклама \\ продано'].concat(A.fcols.map(f=>f+', прод')).concat(['Всего прод']).concat(A.fcols.map(f=>f+', ₸')).concat(['Всего ₸'])];
   for(const a of A.leakRows){const ns=A.fcols.map(f=>(A.leak[a+'|'+f]||{}).n||0),rs=A.fcols.map(f=>(A.leak[a+'|'+f]||{}).rev||0);const n=ns.reduce((s,x)=>s+x,0);if(!n)continue;l.push([a].concat(ns,[n],rs,[rs.reduce((s,x)=>s+x,0)]));}
