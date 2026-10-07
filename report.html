@@ -79,6 +79,11 @@ th.pl{color:var(--plan)}
 tr.total td{font-weight:600;background:var(--surface2);border-bottom:0}
 tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;text-align:left;font-weight:600}
 .mut{color:var(--muted)}
+.tscroll table th:first-child,.tscroll table td:first-child{position:sticky;left:0;z-index:1;background:var(--surface);box-shadow:1px 0 0 var(--border2)}
+.tscroll table th:first-child{background:var(--surface2);z-index:2}
+.tscroll table tr.total td:first-child,.tscroll table tr.grp td:first-child{background:var(--surface2)}
+.tscroll table tr.grp td:first-child{position:static;box-shadow:none}
+.gl{position:sticky;left:10px;display:inline-block}
 .pill{display:inline-block;padding:1px 8px;border-radius:20px;font-weight:600;font-size:12.5px}
 .pill.g{background:var(--good-soft);color:var(--good)} .pill.w{background:var(--warn-soft);color:var(--warn)} .pill.b{background:var(--bad-soft);color:var(--bad)}
 .diag{font-weight:700}
@@ -138,9 +143,9 @@ tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-tr
 </section>
 
 <section>
-  <div class="eyebrow">Экономика и план</div>
+  <div class="eyebrow">Экономика</div>
   <h2>По рекламному направлению</h2>
-  <p class="lead">Направление — по utm_medium. Расход кампании за период делится между направлениями пропорционально её лидам. План периода = месячный план × доля направления × дни периода / дни месяца.</p>
+  <p class="lead">Направление — по utm_medium. Расход кампании за период делится между направлениями пропорционально её лидам. План по лидам — в разделе «План» ниже, по продуктам и городам.</p>
   <div class="tscroll" id="tDir"></div>
 </section>
 
@@ -153,7 +158,7 @@ tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-tr
 
 <section>
   <div class="eyebrow">План</div>
-  <h2>План по лидам: направление × город</h2>
+  <h2>План по лидам: продукт × город</h2>
   <p class="lead" id="planLead"></p>
   <div class="tscroll" id="tPlan"></div>
 </section>
@@ -341,35 +346,52 @@ function compute(){
   const sum=(arr,f)=>arr.reduce((s,x)=>s+f(x),0);
   const tot=blank(),paid=blank();
   for(const x of dirs){for(const f of ['leads','qual','sale','rev','spend','clicks']){tot[f]+=x.M[f];if(x.paid)paid[f]+=x.M[f];}}
-  /* города: строки по платным направлениям. Город — если он задаёт таргет (≥15% лидов направления),
-     иначе одна строка «все города». Остаток — строка «другие города / без города». */
-  const paidDirs=dirs.filter(x=>x.paid).map(x=>x.k);
   const NAMED=['Алматы','Астана','Караганда','Шымкент'];
   const mkey=planMonth();
+  const SUMF=['leads','qual','sale','rev','spend','clicks'];
+  /* разбивка направления на строки-города: город — если ≥15% лидов направления и ≥10 лидов,
+     иначе одна строка «все города»; остаток — «другие города / без города» */
+  function cityGroups(d,base,baseC,cur,allowCities){
+    const bd=base[d]||1;
+    const buckets=[...new Set(Object.keys(cur).concat(Object.keys(baseC)).filter(k=>k.startsWith(d+'|')).map(k=>k.split('|')[1]))];
+    let cand=allowCities?NAMED.filter(c=>(baseC[d+'|'+c]||0)>=10&&(baseC[d+'|'+c]||0)/bd>=0.15):[];
+    cand.sort((x,y)=>(baseC[d+'|'+y]||0)-(baseC[d+'|'+x]||0));
+    const covered=cand.reduce((t,c)=>t+(baseC[d+'|'+c]||0),0)/bd;
+    if(!cand.length||covered<0.5)return [{label:'все города',buckets,share:1}];
+    const out=cand.map(c=>({label:c,buckets:[c],share:(baseC[d+'|'+c]||0)/bd}));
+    const rest=buckets.filter(x=>!cand.includes(x));
+    if(rest.length)out.push({label:'другие города / без города',buckets:rest,share:rest.reduce((t,x)=>t+(baseC[d+'|'+x]||0),0)/bd});
+    return out;
+  }
+  const agg=(src,d,buckets)=>{const o=blank();for(const x of buckets){const c=src[d+'|'+x];if(c)for(const f of SUMF)o[f]+=c[f];}return o;};
+  /* 1) экономика по городам — по рекламному направлению, только платные */
+  const paidDirs=dirs.filter(x=>x.paid).map(x=>x.k);
+  const econRows=[];
+  for(const d of paidDirs){for(const gr of cityGroups(d,baseDir,baseCity,cityG,(baseDir[d]||0)>=10)){
+    econRows.push({k:d+' · '+gr.label,dir:d,M:metr(agg(cityG,d,gr.buckets),rate)});}}
+  /* 2) план — по продукту × городу, все лиды. Платная кампания → её направление;
+     директ, органика и прочие → продукт из «Курс»/формы и город лида (расход 0) */
+  const fbWin=fbForRange(WIN&&!MANUAL?WIN[0]:dataRange()[0],WIN&&!MANUAL?WIN[1]:dataRange()[1]);
+  const paidMed=new Set(Object.keys(fbWin).filter(k=>fbWin[k].spend>0.005));
+  const PRODUCTS=new Set(['ГП','ТЗ','ТЗ_каз','Bust_plus','ТЗ_Кар_Шым'].concat(paidDirs));
+  const planDirOf=r=>{const mn=norm(r.m);if(paidMed.has(mn))return dirOf(r.m);
+    let f=factDir(r);if(f==='ТЗ'){const c=cityBucket(r.c);if(c==='Караганда'||c==='Шымкент')f='ТЗ_Кар_Шым';}
+    return PRODUCTS.has(f)?f:'?'+dirOf(r.m);};
+  const pBase={},pBaseC={},pCur={};
+  for(const r of all){const d=planDirOf(r);pBase[d]=(pBase[d]||0)+1;const k=d+'|'+cityBucket(r.c);pBaseC[k]=(pBaseC[k]||0)+1;}
+  for(const r of R){const d=planDirOf(r),cl=classify(r),k=d+'|'+cityBucket(r.c);const o=pCur[k]||(pCur[k]=blank());o.leads++;if(cl.qual)o.qual++;if(cl.sale){o.sale++;o.rev+=r.b;}}
+  const pKeys=[...new Set(Object.keys(pBase).concat(Object.keys(pCur).map(k=>k.split('|')[0])))];
+  pKeys.sort((x,y)=>((x[0]==='?')-(y[0]==='?'))||((pBase[y]||0)-(pBase[x]||0)));
   const cityRows=[];
-  const agg=(d,buckets)=>{const o=blank();for(const b of buckets){const c=cityG[d+'|'+b];if(c)for(const f of ['leads','qual','sale','rev','spend','clicks'])o[f]+=c[f];}return o;};
-  for(const d of paidDirs){
-    if((baseDir[d]||0)<10)continue;
-    const dx=dirs.find(x=>x.k===d),bd=baseDir[d]||1;
-    const allB=Object.keys(cityG).filter(k=>k.startsWith(d+'|')).map(k=>k.split('|')[1]).concat(Object.keys(baseCity).filter(k=>k.startsWith(d+'|')).map(k=>k.split('|')[1]));
-    const buckets=[...new Set(allB)];
-    let cand=NAMED.filter(c=>(baseCity[d+'|'+c]||0)>=10&&(baseCity[d+'|'+c]||0)/bd>=0.15).sort((a,b)=>(baseCity[d+'|'+b]||0)-(baseCity[d+'|'+a]||0));
-    const covered=cand.reduce((s,c)=>s+(baseCity[d+'|'+c]||0),0)/bd;
-    const groups=[];
-    if(!cand.length||covered<0.5) groups.push({label:'все города',buckets,share:1});
-    else{for(const c of cand)groups.push({label:c,buckets:[c],share:(baseCity[d+'|'+c]||0)/bd});
-      const rest=buckets.filter(b=>!cand.includes(b));const rs=rest.reduce((s,b)=>s+(baseCity[d+'|'+b]||0),0)/bd;
-      if(rest.length&&(rs>0||agg(d,rest).leads>0))groups.push({label:'другие города / без города',buckets:rest,share:rs});}
-    let dp1=0,dp2=0;
-    for(const g of groups){
-      const key=d+'|'+g.label, man=getCityPlan(mkey,key);
-      const a1=ST.p1*dx.share*g.share, a2=ST.p2*dx.share*g.share; /* авто, в месяц */
-      const m1=man&&man.p1>0?man.p1:null, m2=man&&man.p2>0?man.p2:null;
-      const p1=(m1!=null?m1:a1)*months, p2=(m2!=null?m2:a2)*months;
-      dp1+=p1;dp2+=p2;
-      cityRows.push({k:d+' · '+g.label,key,dir:d,M:metr(agg(d,g.buckets),rate),cityShare:g.share,auto1:a1,auto2:a2,man1:m1,man2:m2,p1,p2});
+  for(const d of pKeys){
+    const und=d[0]==='?',name=und?d.slice(1):d,dShare=(pBase[d]||0)/baseN;
+    for(const gr of cityGroups(d,pBase,pBaseC,pCur,!und&&(pBase[d]||0)>=10)){
+      const key=d+'|'+gr.label,man=getCityPlan(mkey,key);
+      const a1=ST.p1*dShare*gr.share,a2=ST.p2*dShare*gr.share;
+      const m1=man&&man.p1>0?man.p1:null,m2=man&&man.p2>0?man.p2:null;
+      cityRows.push({k:und?name:name+' · '+gr.label,key,dir:und?'Продукт не определён':name,und,M:metr(agg(pCur,d,gr.buckets),rate),cityShare:gr.share,
+        auto1:a1,auto2:a2,man1:m1,man2:m2,p1:(m1!=null?m1:a1)*months,p2:(m2!=null?m2:a2)*months});
     }
-    dx.p1=dp1;dx.p2=dp2; /* план направления = сумма строк */
   }
   /* утечка */
   const leakRows=[...paidDirs];const otherLbl='Органика, social, сарафанка, прочее';
@@ -386,7 +408,7 @@ function compute(){
   const daily={};for(const r of R)daily[r.d]=(daily[r.d]||0)+1;
   /* расход FB по кампаниям */
   const fbRows=Object.keys(fb).map(mn=>({name:fb[mn].name,dir:medLeads[mn]?dirOf(fb[mn].name):'нет лидов',spend:fb[mn].spend,impr:fb[mn].impr,clicks:fb[mn].clicks,leads:medLeads[mn]||0})).sort((a,b)=>b.spend-a.spend);
-  LAST={from,to,days,months,R,dirs,tot:metr(tot,rate),paid:metr(paid,rate),unalloc,unallocList,cityRows,leakRows,leak,fcols,loss,qClosed,qWork,qSale,daily,fbRows,rate,p1:ST.p1,p2:ST.p2};
+  LAST={from,to,days,months,R,dirs,tot:metr(tot,rate),paid:metr(paid,rate),unalloc,unallocList,cityRows,econRows,leakRows,leak,fcols,loss,qClosed,qWork,qSale,daily,fbRows,rate,p1:ST.p1,p2:ST.p2};
   return LAST;
 }
 
@@ -398,7 +420,7 @@ function render(){
   const A=compute();
   document.getElementById('periodLbl').textContent='Итог периода '+ddmm(A.from)+' – '+ddmm(A.to)+' · '+A.days+' дн.';
   const T=A.tot,P=A.paid;
-  const pp1=A.dirs.reduce((s,x)=>s+x.p1,0),pp2=A.dirs.reduce((s,x)=>s+x.p2,0);
+  const pp1=A.cityRows.reduce((s,x)=>s+x.p1,0),pp2=A.cityRows.reduce((s,x)=>s+x.p2,0);
   const tiles=[
     ['Лиды',fI(T.leads),(T.leads/A.days).toFixed(1).replace('.',',')+' в день',''],
     ['План 1 / План 2',fI(pp1)+' / '+fI(pp2),'факт '+(pp1?Math.round(T.leads/pp1*100):0)+'% / '+(pp2?Math.round(T.leads/pp2*100):0)+'%',''],
@@ -416,19 +438,19 @@ function render(){
 }
 function renderDir(A){
   if(!A.R.length){document.getElementById('tDir').innerHTML='<div class="empty">Нет лидов за период</div>';return;}
-  let h='<table><thead><tr><th class="l">Направление</th><th>Лиды</th><th>Конв. сайта</th><th>Квал</th><th>%квал</th><th>CPQL</th><th>Прод</th><th>%кв→прод</th><th>CAC</th><th>Выручка ₸</th><th>Расход</th><th>CPL</th><th>ROMI</th><th class="pl">План 1</th><th class="pl">% пл.1</th><th class="pl">План 2</th><th class="pl">% пл.2</th></tr></thead><tbody>';
-  const row=(name,M,p1,p2,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td class="l">'+esc(name)+'</td><td>'+fI(M.leads)+'</td><td>'+(M.conv==null?dash:fP(M.conv))+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+(M.cpql?fU(M.cpql):dash)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.cac?fU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+(M.spend>0?fU(M.spend):dash)+'</td><td>'+(M.cpl?fU(M.cpl):dash)+'</td><td>'+romiPill(M.romi)+'</td><td>'+fI(p1)+'</td><td>'+planPill(M.leads,p1)+'</td><td>'+fI(p2)+'</td><td>'+planPill(M.leads,p2)+'</td></tr>';
+  let h='<table><thead><tr><th class="l">Направление</th><th>Лиды</th><th>Конв. сайта</th><th>Квал</th><th>%квал</th><th>CPQL</th><th>Прод</th><th>%кв→прод</th><th>CAC</th><th>Выручка ₸</th><th>Расход</th><th>CPL</th><th>ROMI</th></tr></thead><tbody>';
+  const row=(name,M,p1,p2,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td class="l">'+esc(name)+'</td><td>'+fI(M.leads)+'</td><td>'+(M.conv==null?dash:fP(M.conv))+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+(M.cpql?fU(M.cpql):dash)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.cac?fU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+(M.spend>0?fU(M.spend):dash)+'</td><td>'+(M.cpl?fU(M.cpl):dash)+'</td><td>'+romiPill(M.romi)+'</td></tr>';
   const paid=A.dirs.filter(x=>x.paid),free=A.dirs.filter(x=>!x.paid);
-  if(paid.length){h+='<tr class="grp"><td colspan="17">Платный трафик (Facebook)</td></tr>';for(const x of paid)h+=row(x.k,x.M,x.p1,x.p2);
+  if(paid.length){h+='<tr class="grp"><td colspan="13"><span class="gl">Платный трафик (Facebook)</span></td></tr>';for(const x of paid)h+=row(x.k,x.M,x.p1,x.p2);
     h+=row('Итого платный',A.paid,paid.reduce((s,x)=>s+x.p1,0),paid.reduce((s,x)=>s+x.p2,0),'total');}
-  if(free.length){h+='<tr class="grp"><td colspan="17">Без расхода в FB</td></tr>';for(const x of free)h+=row(x.k,x.M,x.p1,x.p2);}
+  if(free.length){h+='<tr class="grp"><td colspan="13"><span class="gl">Без расхода в FB</span></td></tr>';for(const x of free)h+=row(x.k,x.M,x.p1,x.p2);}
   h+=row('Всего',A.tot,A.dirs.reduce((s,x)=>s+x.p1,0),A.dirs.reduce((s,x)=>s+x.p2,0),'total');
   document.getElementById('tDir').innerHTML=h+'</tbody></table>';
 }
 function renderCity(A){
-  if(!A.cityRows.length){document.getElementById('tCity').innerHTML='<div class="empty">Нет данных</div>';return;}
+  if(!A.econRows.length){document.getElementById('tCity').innerHTML='<div class="empty">Нет данных</div>';return;}
   let h='<table><thead><tr><th class="l">Направление · город</th><th>Лиды</th><th>Квал</th><th>%квал</th><th>Прод</th><th>%кв→прод</th><th>Расход</th><th>CPL</th><th>CPQL</th><th>CAC</th><th>Выручка ₸</th><th>ROMI</th></tr></thead><tbody>';
-  for(const x of A.cityRows){const M=x.M;h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(M.leads)+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.spend>0?fU(M.spend):dash)+'</td><td>'+(M.cpl?fU(M.cpl):dash)+'</td><td>'+(M.cpql?fU(M.cpql):dash)+'</td><td>'+(M.cac?fU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+romiPill(M.romi)+'</td></tr>';}
+  for(const x of A.econRows){const M=x.M;h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(M.leads)+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.spend>0?fU(M.spend):dash)+'</td><td>'+(M.cpl?fU(M.cpl):dash)+'</td><td>'+(M.cpql?fU(M.cpql):dash)+'</td><td>'+(M.cac?fU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+romiPill(M.romi)+'</td></tr>';}
   document.getElementById('tCity').innerHTML=h+'</tbody></table>';
 }
 function renderPlan(A){
@@ -436,15 +458,15 @@ function renderPlan(A){
   document.getElementById('planLead').innerHTML='Впишите месячный план по каждой строке — он сохранится для <b>'+mk.slice(5,7)+'.'+mk.slice(0,4)+'</b> и следующих месяцев, пока не поменяете. Пустая ячейка = авто: общий план '+fI(A.p1)+' / '+fI(A.p2)+' × доля строки в лидах. План периода = месячный × '+A.days+' дн. / дни месяца. План направления в таблице выше = сумма его строк.';
   if(!A.cityRows.length){document.getElementById('tPlan').innerHTML='<div class="empty">Нет данных</div>';return;}
   const inp=(x,f,man,auto)=>'<input class="pin" type="number" min="0" step="1" inputmode="numeric" data-key="'+esc(x.key)+'" data-f="'+f+'" value="'+(man!=null?Math.round(man):'')+'" placeholder="'+Math.round(auto)+'" aria-label="'+esc(x.k)+' — План '+(f==='p1'?1:2)+' в месяц">';
-  let h='<table><thead><tr><th class="l">Направление · город</th><th class="pl">План 1 / мес</th><th class="pl">План 2 / мес</th><th>Факт</th><th class="pl">План 1</th><th class="pl">/ день</th><th class="pl">% плана 1</th><th>Откл.</th><th class="pl">План 2</th><th class="pl">/ день</th><th class="pl">% плана 2</th><th>Откл.</th></tr></thead><tbody>';
+  let h='<table><thead><tr><th class="l">Продукт · город</th><th class="pl">План 1 / мес</th><th class="pl">План 2 / мес</th><th>Факт</th><th class="pl">План 1</th><th class="pl">/ день</th><th class="pl">% плана 1</th><th>Откл.</th><th class="pl">План 2</th><th class="pl">/ день</th><th class="pl">% плана 2</th><th>Откл.</th></tr></thead><tbody>';
   let F=0,P1=0,P2=0,M1=0,M2=0,cur='';
   const sub={};
   for(const x of A.cityRows){F+=x.M.leads;P1+=x.p1;P2+=x.p2;M1+=x.man1!=null?x.man1:x.auto1;M2+=x.man2!=null?x.man2:x.auto2;
-    if(x.dir!==cur){cur=x.dir;h+='<tr class="grp"><td colspan="12">'+esc(x.dir)+'</td></tr>';}
+    const gname=x.dir;if(gname!==cur){cur=gname;h+='<tr class="grp"><td colspan="12"><span class=\"gl\">'+esc(gname)+'</span></td></tr>';}
     h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+inp(x,'p1',x.man1,x.auto1)+'</td><td>'+inp(x,'p2',x.man2,x.auto2)+'</td><td>'+fI(x.M.leads)+'</td><td>'+fI(x.p1)+'</td><td>'+(x.p1/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(x.M.leads,x.p1)+'</td><td>'+dev(x.M.leads,x.p1)+'</td><td>'+fI(x.p2)+'</td><td>'+(x.p2/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(x.M.leads,x.p2)+'</td><td>'+dev(x.M.leads,x.p2)+'</td></tr>';}
-  h+='<tr class="total"><td class="l">Итого платные направления</td><td>'+fI(M1)+'</td><td>'+fI(M2)+'</td><td>'+fI(F)+'</td><td>'+fI(P1)+'</td><td>'+(P1/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P1)+'</td><td>'+dev(F,P1)+'</td><td>'+fI(P2)+'</td><td>'+(P2/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P2)+'</td><td>'+dev(F,P2)+'</td></tr>';
+  h+='<tr class="total"><td class="l">Итого</td><td>'+fI(M1)+'</td><td>'+fI(M2)+'</td><td>'+fI(F)+'</td><td>'+fI(P1)+'</td><td>'+(P1/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P1)+'</td><td>'+dev(F,P1)+'</td><td>'+fI(P2)+'</td><td>'+(P2/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P2)+'</td><td>'+dev(F,P2)+'</td></tr>';
   const anyMan=A.cityRows.some(x=>x.man1!=null||x.man2!=null);
-  document.getElementById('tPlan').innerHTML=h+'</tbody></table><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px"><p class="note" style="margin:0">Директ, органика и прочие каналы без расхода в эту таблицу не входят — их план считается авто от общего. Планы хранятся в этом браузере.</p>'+(anyMan?'<button class="btn" id="bResetPlan">Сбросить ручные планы за '+mk.slice(5,7)+'.'+mk.slice(0,4)+'</button>':'')+'</div>';
+  document.getElementById('tPlan').innerHTML=h+'</tbody></table><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px"><p class="note" style="margin:0">В таблице все лиды периода. Лиды платных кампаний — в направлении кампании; лиды из директа, органики, social и других каналов без расхода — в продукте из поля «Курс» (или формы) и городе лида. «Продукт не определён» — лиды, у которых ни курса, ни формы нет. Итог совпадает с карточкой «Лиды». Планы хранятся в этом браузере.</p>'+(anyMan?'<button class="btn" id="bResetPlan">Сбросить ручные планы за '+mk.slice(5,7)+'.'+mk.slice(0,4)+'</button>':'')+'</div>';
 }
 document.getElementById('tPlan').addEventListener('change',e=>{const t=e.target;if(!t.classList||!t.classList.contains('pin'))return;
   const v=parseFloat(String(t.value).replace(',','.'));setCityPlan(planMonth(),t.dataset.key,t.dataset.f,v>0?v:null);
@@ -558,20 +580,20 @@ function buildWorkbook(){
   add('Сводка',[['Invictus · аналитика лидов'],['Период',per],['Дней',A.days],['Курс ₸/$',A.rate],['План 1, лиды/мес',A.p1],['План 2, лиды/мес',A.p2],[],
     ['Показатель','Всего','Платный трафик'],['Лиды',T.leads,P.leads],['Квалы',T.qual,P.qual],['% квал',r1(T.qpct),r1(P.qpct)],['Продажи',T.sale,P.sale],['% квал→продажа',r1(T.spct),r1(P.spct)],
     ['Выручка ₸',Math.round(T.rev),Math.round(P.rev)],['Расход $',r2(P.spend),r2(P.spend)],['CPL $',r2(T.spend?T.spend/T.leads:null),r2(P.cpl)],['CPQL $',r2(T.spend?T.spend/T.qual:null),r2(P.cpql)],['CAC $',r2(T.spend&&T.sale?T.spend/T.sale:null),r2(P.cac)],['ROMI %',r1(T.romi),r1(P.romi)],
-    ['План 1, лиды за период',Math.round(A.dirs.reduce((s,x)=>s+x.p1,0))],['План 2, лиды за период',Math.round(A.dirs.reduce((s,x)=>s+x.p2,0))],[],
+    ['План 1, лиды за период',Math.round(A.cityRows.reduce((s,x)=>s+x.p1,0))],['План 2, лиды за период',Math.round(A.cityRows.reduce((s,x)=>s+x.p2,0))],[],
     ['Источники: лиды — '+srcAmo+'; расход — '+srcFb+'. ROMI «Всего» включает выручку неплатных каналов, окупаемость рекламы — колонка «Платный трафик».']],[34,16,16]);
-  const dh=['Направление','Тип','Лиды','Конв. сайта %','Квал','%квал','CPQL $','Продажи','%кв→прод','CAC $','Выручка ₸','Расход $','CPL $','ROMI %','План 1','% плана 1','Откл. 1','План 2','% плана 2','Откл. 2'];
-  const drow=(name,type,M,p1,p2)=>[name,type,M.leads,r1(M.conv),M.qual,r1(M.qpct),r2(M.cpql),M.sale,r1(M.spct),r2(M.cac),Math.round(M.rev),r2(M.spend),r2(M.cpl),r1(M.romi),Math.round(p1),p1?Math.round(M.leads/p1*100):'',Math.round(M.leads-p1),Math.round(p2),p2?Math.round(M.leads/p2*100):'',Math.round(M.leads-p2)];
+  const dh=['Направление','Тип','Лиды','Конв. сайта %','Квал','%квал','CPQL $','Продажи','%кв→прод','CAC $','Выручка ₸','Расход $','CPL $','ROMI %'];
+  const drow=(name,type,M,p1,p2)=>[name,type,M.leads,r1(M.conv),M.qual,r1(M.qpct),r2(M.cpql),M.sale,r1(M.spct),r2(M.cac),Math.round(M.rev),r2(M.spend),r2(M.cpl),r1(M.romi)];
   const d=[['По рекламному направлению · '+per],dh];for(const x of A.dirs)d.push(drow(x.k,x.paid?'Платный':'Без расхода',x.M,x.p1,x.p2));
   const pd=A.dirs.filter(x=>x.paid);d.push(drow('Итого платный','',A.paid,pd.reduce((s,x)=>s+x.p1,0),pd.reduce((s,x)=>s+x.p2,0)));
   d.push(drow('Всего','',A.tot,A.dirs.reduce((s,x)=>s+x.p1,0),A.dirs.reduce((s,x)=>s+x.p2,0)));
   add('Направления',d,[24,12].concat(Array(18).fill(11)));
   const c=[['Направление × город · '+per],['Направление · город','Лиды','Квал','%квал','Продажи','%кв→прод','Расход $','CPL $','CPQL $','CAC $','Выручка ₸','ROMI %']];
-  for(const x of A.cityRows){const M=x.M;c.push([x.k,M.leads,M.qual,r1(M.qpct),M.sale,r1(M.spct),r2(M.spend),r2(M.cpl),r2(M.cpql),r2(M.cac),Math.round(M.rev),r1(M.romi)]);}
+  for(const x of A.econRows){const M=x.M;c.push([x.k,M.leads,M.qual,r1(M.qpct),M.sale,r1(M.spct),r2(M.spend),r2(M.cpl),r2(M.cpql),r2(M.cac),Math.round(M.rev),r1(M.romi)]);}
   c.push([],['Расход кампании делится между городами пропорционально лидам.']);add('Города',c,[30].concat(Array(11).fill(11)));
-  const p=[['План по лидам: направление × город · '+per],['Направление · город','План 1 / мес','План 2 / мес','Источник плана','Факт','План 1','План 1 / день','% плана 1','Откл. 1','План 2','План 2 / день','% плана 2','Откл. 2']];
+  const p=[['План по лидам: продукт × город · '+per],['Продукт · город','План 1 / мес','План 2 / мес','Источник плана','Факт','План 1','План 1 / день','% плана 1','Откл. 1','План 2','План 2 / день','% плана 2','Откл. 2']];
   let F=0,P1=0,P2=0;for(const x of A.cityRows){F+=x.M.leads;P1+=x.p1;P2+=x.p2;p.push([x.k,Math.round(x.man1!=null?x.man1:x.auto1),Math.round(x.man2!=null?x.man2:x.auto2),(x.man1!=null||x.man2!=null)?'вручную':'авто',x.M.leads,Math.round(x.p1),r1(x.p1/A.days),x.p1?Math.round(x.M.leads/x.p1*100):'',Math.round(x.M.leads-x.p1),Math.round(x.p2),r1(x.p2/A.days),x.p2?Math.round(x.M.leads/x.p2*100):'',Math.round(x.M.leads-x.p2)]);}
-  p.push(['Итого платные направления','','','',F,Math.round(P1),r1(P1/A.days),P1?Math.round(F/P1*100):'',Math.round(F-P1),Math.round(P2),r1(P2/A.days),P2?Math.round(F/P2*100):'',Math.round(F-P2)]);
+  p.push(['Итого','','','',F,Math.round(P1),r1(P1/A.days),P1?Math.round(F/P1*100):'',Math.round(F-P1),Math.round(P2),r1(P2/A.days),P2?Math.round(F/P2*100):'',Math.round(F-P2)]);
   add('План по городам',p,[30].concat(Array(10).fill(12)));
   const l=[['Что рекламировали → что продали · '+per],['Реклама \\ продано'].concat(A.fcols.map(f=>f+', прод')).concat(['Всего прод']).concat(A.fcols.map(f=>f+', ₸')).concat(['Всего ₸'])];
   for(const a of A.leakRows){const ns=A.fcols.map(f=>(A.leak[a+'|'+f]||{}).n||0),rs=A.fcols.map(f=>(A.leak[a+'|'+f]||{}).rev||0);const n=ns.reduce((s,x)=>s+x,0);if(!n)continue;l.push([a].concat(ns,[n],rs,[rs.reduce((s,x)=>s+x,0)]));}
