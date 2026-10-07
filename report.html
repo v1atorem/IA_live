@@ -92,7 +92,7 @@ tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-tr
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;min-width:0}
 .panel h3{font:600 15px var(--f-body);margin:0 0 10px}
 .bars{display:flex;flex-direction:column;gap:7px}
-.brow{display:grid;grid-template-columns:minmax(110px,220px) 1fr 52px;gap:10px;align-items:center;font-size:13.5px}
+.brow{display:grid;grid-template-columns:minmax(110px,220px) 1fr 92px;gap:10px;align-items:center;font-size:13.5px}
 .brow .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .brow .track{height:12px;background:var(--surface2);border-radius:6px;overflow:hidden}
 .brow .fill{height:100%;background:var(--bar);border-radius:6px}
@@ -108,6 +108,13 @@ tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-tr
 .pin:focus{border-color:var(--plan);outline:none}
 .dynbar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end}
 .sel{padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--ink);font:500 14px var(--f-body);max-width:100%}
+.kz{display:block;white-space:nowrap}.usd{display:block;font-size:11px;color:var(--muted);line-height:1.2}
+.kpi .d .kz,.kpi .d .usd{display:inline;font-size:inherit}.kpi .d .usd::before{content:' · '}
+.calinfo{font-size:13px;color:var(--muted);margin-top:8px}.calinfo a{color:var(--plan)}
+.calstrip{display:flex;gap:4px;overflow-x:auto;margin-top:8px;padding-bottom:4px}
+.cd{min-width:38px;border:1px solid var(--border);border-radius:7px;padding:3px 4px;text-align:center;font-size:11px;line-height:1.25;background:var(--surface);font-variant-numeric:tabular-nums}
+.cd b{display:block;font-size:11px;color:var(--muted)}.cd span{display:block;font-weight:600;font-size:12.5px}.cd i{display:block;font-style:normal;color:var(--plan)}
+.cd.off{background:var(--surface2);opacity:.7}.cd.ok{border-color:var(--good)}.cd.mid{border-color:var(--warn)}.cd.low{border-color:var(--bad)}
 .empty{padding:28px;text-align:center;color:var(--muted)}
 </style>
 
@@ -182,8 +189,11 @@ tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-tr
 <section>
   <div class="eyebrow">Утечка</div>
   <h2>Что рекламировали и что в итоге продали</h2>
-  <p class="lead">Продано — по полю «Курс», если пусто — по форме на сайте. Ячейка: продажи · выручка, млн ₸.</p>
+  <p class="lead">Строка — продукт, который реально интересовал лида (поле «Курс», форма, страница сайта), и его город, как в планах. Колонка — какая реклама привела лида. Подсвечены ячейки, где реклама и продукт совпали. В ячейке — число и доля от строки.</p>
+  <div class="presets" id="leakMet" style="margin-bottom:10px"><button class="chip on" data-m="leads">Лиды</button><button class="chip" data-m="qual">Квалы</button><button class="chip" data-m="sale">Продажи</button><button class="chip" data-m="rev">Выручка</button></div>
   <div class="tscroll" id="tLeak"></div>
+  <h3 style="margin-top:22px">Продажи: реклама → проданный продукт</h3>
+  <div class="tscroll" id="tLeakOld"></div>
 </section>
 
 <section>
@@ -195,6 +205,9 @@ tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-tr
       <div class="bars" id="lossBars"></div></div>
     <div class="panel"><h3>Из чего состоят квалы</h3><div class="bars" id="qualBars"></div><p class="note" id="qualNote" style="margin-top:12px"></p></div>
   </div>
+  <h3 style="font:600 16px var(--f-body);margin:8px 0 0">Лиды в работе по этапам · продукт × город</h3>
+  <p class="lead">Только незакрытые лиды (не продажа и не «Закрыто и не реализовано»). Ячейка: число лидов · % от всех лидов строки.</p>
+  <div class="tscroll" id="tWork"></div>
 </section>
 
 <section>
@@ -246,6 +259,8 @@ function lossKey(r){const b=baseStage(r.st);if(b==='закрыто и не ре�
 /* ===== форматирование ===== */
 const fI=n=>Math.round(n).toLocaleString('ru-RU');
 const fK=n=>Math.round(n).toLocaleString('ru-RU')+' ₸';
+const fKU=n=>'<span class="kz">'+fK(n*ST.rate)+'</span><small class="usd">'+fU(n)+'</small>';
+const fKUi=n=>fK(n*ST.rate)+' ('+fU(n)+')';
 const fU=n=>'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/,/g,' ');
 const fP=(n,d=1)=>n.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d})+'%';
 const fM=n=>(n/1e6).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -258,7 +273,7 @@ function daysBetween(a,b){return Math.round((new Date(b+'T00:00:00Z')-new Date(a
 function daysInMonth(iso){const y=+iso.slice(0,4),m=+iso.slice(5,7);return new Date(Date.UTC(y,m,0)).getUTCDate();}
 
 /* ===== состояние ===== */
-let LEADS=[], FB=[], srcAmo='—', srcFb='—', WIN=null, LOADING=false, MANUAL=false, PAYS=null;
+let PAYS_CUT=0, CAL=null, LEADS=[], FB=[], srcAmo='—', srcFb='—', WIN=null, LOADING=false, MANUAL=false, PAYS=null;
 const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
 let ST={unk:store.get('ia_unk','ТЗ'),from:'',to:'',p1:store.get('ia_p1',3400),p2:store.get('ia_p2',3257),rate:store.get('ia_rate',465),preset:'all'};
 let LAST=null;
@@ -272,11 +287,15 @@ function applyApi(d,win){
   if(!d||d.error)throw new Error(d&&d.error?d.error:'пустой ответ API');
   if(!Array.isArray(d.records))throw new Error('API не вернул лиды');
   LEADS=d.records.map(r=>{let m=String(r.m||'').trim();const has=m||String(r.cmp||'').trim()||String(r.src||'').trim()||String(r.tags||'').trim();if(!has)m='Сарафанка';
-    return {d:String(r.d||'').slice(0,10),st:String(r.st||''),rs:String(r.rs||''),b:+r.b||0,m,cmp:String(r.cmp||''),src:String(r.src||''),c:String(r.c||''),l:String(r.l||''),fn:String(r.fn||''),crs:String(r.crs||''),tags:String(r.tags||''),nm:String(r.nm||''),ref:String(r.ref||''),gym:String(r.gym||'')};}).filter(r=>r.d);
+    return {id:String(r.id==null?'':r.id).replace(/\.0$/,''),d:String(r.d||'').slice(0,10),st:String(r.st||''),rs:String(r.rs||''),b:+r.b||0,m,cmp:String(r.cmp||''),src:String(r.src||''),c:String(r.c||''),l:String(r.l||''),fn:String(r.fn||''),crs:String(r.crs||''),tags:String(r.tags||''),nm:String(r.nm||''),ref:String(r.ref||''),gym:String(r.gym||'')};}).filter(r=>r.d);
   const k=d.fbCur==='kzt'?1/ST.rate:1;FB=[];
   if(d.fbDaily&&typeof d.fbDaily==='object'){for(const camp in d.fbDaily){const days=d.fbDaily[camp];for(const day in days){const x=days[day]||{};FB.push({camp,day:String(day).slice(0,10),spend:(+x.spend||0)*k,impr:+x.impr||0,clicks:+x.clicks||0,from:'',to:''});}}}
   else if(d.fbData&&typeof d.fbData==='object'){for(const camp in d.fbData){const x=d.fbData[camp]||{};FB.push({camp,day:'',spend:(+x.spend||0)*k,impr:+x.impr||0,clicks:+x.clicks||0,from:win[0],to:win[1]});}}
-  PAYS=(d.payMap&&typeof d.payMap==='object')?d.payMap:null;
+  PAYS=null;
+  if(d.payMap&&typeof d.payMap==='object'){PAYS={};let cut=0;
+    for(const k in d.payMap){const p=d.payMap[k];const who=norm([p.mgr,p.manager,p.who,p.curator].filter(Boolean).join(' '));
+      if(who.includes('куратор')){cut++;continue;}PAYS[k]=p;}
+    PAYS_CUT=cut;}
   WIN=win;MANUAL=false;
   const upd=d.updatedAt?' · обновлено '+new Date(d.updatedAt).toLocaleString('ru-RU'):'';
   srcAmo='API amoCRM, '+ddmm(win[0])+' – '+ddmm(win[1])+upd;srcFb='API Facebook'+(d.fbDaily?' (по дням)':' (за весь период)');
@@ -286,7 +305,8 @@ async function loadWindow(win,force){
   try{
     try{const m=await apiGet({action:'getmap'},30000);let mm=(m&&m.map!=null)?m.map:m;if(typeof mm==='string')mm=JSON.parse(mm);if(mm&&mm.map&&typeof mm.map==='object')MAP=mm.map;else if(mm&&typeof mm==='object'&&!mm.error)MAP=mm;}catch(e){}
     const d=await apiGet({action:'data',from:win[0],to:win[1],force:force?1:0});
-    applyApi(d,win);document.getElementById('exportMsg').hidden=true;
+    applyApi(d,win);
+    try{const c=await apiGet({action:'calendar',from:win[0],to:win[1]},60000);CAL=(c&&c.days&&!c.error&&Object.keys(c.days).length)?c:null;}catch(e){CAL=null;}document.getElementById('exportMsg').hidden=true;
   }catch(err){showMsg('Не удалось загрузить данные из API: '+esc(err.message)+'. Можно загрузить выгрузки вручную кнопками «amoCRM файл» и «FB файл».','err');}
   finally{setLoading(false);}
 }
@@ -419,6 +439,38 @@ function compute(){
   const leadRows=R.map(r=>rowKeyOf[planDirOf(r,false)+'|'+cityBucket(r.c)]||'');
   const medRow={},medN={};
   R.forEach((r,i)=>{const mn=norm(r.m);if(!paidMed.has(mn))return;medN[mn]=(medN[mn]||0)+1;const o=medRow[mn]||(medRow[mn]={});o[leadRows[i]]=(o[leadRows[i]]||0)+1;});
+  /* базовые конверсии строк плана по всему окну (для авто-плана квалов/продаж/выручки) */
+  const baseRow={};
+  for(const r of all){const k=rowKeyOf[planDirOf(r,false)+'|'+cityBucket(r.c)];if(!k)continue;const o=baseRow[k]||(baseRow[k]={leads:0,qual:0,sale:0,rev:0});const cl=classify(r);o.leads++;if(cl.qual)o.qual++;if(cl.sale){o.sale++;o.rev+=r.b;}}
+  /* календарь планов */
+  const calDaily={};let calOn=false;const calWork={};
+  if(CAL&&CAL.days){
+    const rowsOf=d=>cityRows.filter(x=>x.dir===d).map(x=>x.key);
+    const mapSeg=name=>{const pr=String(name).split(' · ');const d=pr[0],lbl=pr[1]==='другие'?'другие города / без города':(pr[1]||'');const rs=rowsOf(d);
+      if(rs.includes(d+'|'+lbl))return d+'|'+lbl;if(rs.includes(d+'|все города'))return d+'|все города';if(rs.includes(d+'|другие города / без города'))return d+'|другие города / без города';return rs[0]||'';};
+    for(const day in CAL.days){if(day<from||day>to)continue;calOn=true;const o=CAL.days[day];calWork[day]=o.work;const t=calDaily[day]={};
+      for(const sg in o.seg){const k=mapSeg(sg);if(!k)continue;const z=t[k]||(t[k]={leads:0,qual:0,sale:0,rev:0});for(const f in z)z[f]+=+o.seg[sg][f]||0;}}
+  }
+  for(const x of cityRows){
+    const b=baseRow[x.key]||{leads:0,qual:0,sale:0,rev:0};
+    const qr=b.leads?b.qual/b.leads:0,sr=b.qual?b.sale/b.qual:0,ck=b.sale?b.rev/b.sale:0;
+    if(calOn){const c={leads:0,qual:0,sale:0,rev:0};for(const day in calDaily){const z=calDaily[day][x.key];if(z)for(const f in c)c[f]+=z[f];}
+      x.plan=c;x.p1=c.leads;x.src='календарь';}
+    else{x.plan={leads:x.p1,qual:x.p1*qr,sale:x.p1*qr*sr,rev:x.p1*qr*sr*ck};x.src=(x.man1!=null?'вручную':'авто');}
+  }
+  /* оплаты из таблицы оплат */
+  const leadById={};for(const r of all)if(r.id)leadById[r.id]=r;
+  const rowFor=(d,c)=>{if(rowKeyOf[d+'|'+c])return rowKeyOf[d+'|'+c];const rs=cityRows.filter(x=>x.dir===d).map(x=>x.key);
+    return rs.find(k=>k.endsWith('|все города'))||rs.find(k=>k.endsWith('|другие города / без города'))||rs[0]||'';};
+  const pays=[];
+  if(PAYS){for(const k in PAYS){const p=PAYS[k];const dt=String(p.date||'').slice(0,10);if(!dt||dt<from||dt>to)continue;
+    const id=String(p.id||k).replace(/\.0$/,''),L=leadById[id];let d,c,ld='';
+    if(L){d=planDirOf(L,false);c=cityBucket(L.c);ld=L.d;}else{d=pkgDir(p.pkg);if(d==='ТЗ_Кар_Шым')d='ТЗ';if(!PRODUCTS.has(d))d=ST.unk;c=cityBucket(p.city);}
+    pays.push({id,dt,sum:+p.paid||0,row:rowFor(d,c),same:!!ld&&ld.slice(0,7)===dt.slice(0,7),inPer:!!ld&&ld>=from&&ld<=to});}}
+  const payRow={};const payT={n:0,sum:0,newN:0,newSum:0,oldN:0,oldSum:0};
+  for(const x of pays){const o=payRow[x.row]||(payRow[x.row]={n:0,sum:0,sameN:0,sameSum:0,prevN:0,prevSum:0});o.n++;o.sum+=x.sum;
+    if(x.same){o.sameN++;o.sameSum+=x.sum;}else{o.prevN++;o.prevSum+=x.sum;}
+    payT.n++;payT.sum+=x.sum;if(x.inPer){payT.newN++;payT.newSum+=x.sum;}else{payT.oldN++;payT.oldSum+=x.sum;}}
   /* утечка */
   const leakRows=[...paidDirs];const otherLbl='Органика, social, сарафанка, прочее';
   if(dirs.some(x=>x.k==='директ'))leakRows.push('директ');leakRows.push(otherLbl);
@@ -426,6 +478,11 @@ function compute(){
   for(const r of R){const cl=classify(r);if(!cl.sale)continue;let a=dirOf(r.m);if(!leakRows.includes(a))a=otherLbl;const f=factDir(r);factCols[f]=(factCols[f]||0)+1;
     const k=a+'|'+f;const o=leak[k]||(leak[k]={n:0,rev:0});o.n++;o.rev+=r.b;}
   const fcols=Object.keys(factCols).sort((a,b)=>factCols[b]-factCols[a]);
+  /* утечка по продукту·городу: строка — фактический продукт лида (Курс → форма → доп. признаки) и его город, колонка — источник рекламы */
+  const leak2={};
+  const factProd=r=>{let d=factDir(r);if(d==='ТЗ_Кар_Шым')d='ТЗ';if(!PRODUCTS.has(d))d=extraProduct(r);if(!PRODUCTS.has(d)){d=dirOf(r.m);if(d==='ТЗ_Кар_Шым')d='ТЗ';}if(!PRODUCTS.has(d))d=ST.unk;return d;};
+  for(const r of R){const cl=classify(r);let a=dirOf(r.m);if(!leakRows.includes(a))a=otherLbl;const rk=rowFor(factProd(r),cityBucket(r.c));
+    const o=(leak2[rk]||(leak2[rk]={}));const z=o[a]||(o[a]={leads:0,qual:0,sale:0,rev:0});z.leads++;if(cl.qual)z.qual++;if(cl.sale){z.sale++;z.rev+=r.b;}}
   /* потери */
   const loss={};let qClosed=0,qWork=0,qSale=0;
   for(const r of R){const L=lossKey(r);const o=loss[L.k]||(loss[L.k]={n:0,t:L.t});o.n++;
@@ -434,7 +491,7 @@ function compute(){
   const daily={};for(const r of R)daily[r.d]=(daily[r.d]||0)+1;
   /* расход FB по кампаниям */
   const fbRows=Object.keys(fb).map(mn=>({name:fb[mn].name,dir:medLeads[mn]?dirOf(fb[mn].name):'нет лидов',spend:fb[mn].spend,impr:fb[mn].impr,clicks:fb[mn].clicks,leads:medLeads[mn]||0})).sort((a,b)=>b.spend-a.spend);
-  LAST={from,to,days,months,R,dirs,tot:metr(tot,rate),paid:metr(paid,rate),unalloc,unallocList,cityRows,econRows,leadRows,medRow,medN,unkCount,unk:ST.unk,leakRows,leak,fcols,loss,qClosed,qWork,qSale,daily,fbRows,rate,p1:ST.p1,p2:ST.p2};
+  LAST={from,to,days,months,R,dirs,tot:metr(tot,rate),paid:metr(paid,rate),unalloc,unallocList,cityRows,econRows,calOn,calDaily,calWork,pays,payRow,payT,hasPays:!!PAYS,leadRows,medRow,medN,unkCount,unk:ST.unk,leakRows,leak,leak2,fcols,loss,qClosed,qWork,qSale,daily,fbRows,rate,p1:ST.p1,p2:ST.p2};
   return LAST;
 }
 
@@ -447,25 +504,28 @@ function render(){
   document.getElementById('periodLbl').textContent='Итог периода '+ddmm(A.from)+' – '+ddmm(A.to)+' · '+A.days+' дн.';
   const T=A.tot,P=A.paid;
   const pp1=A.cityRows.reduce((s,x)=>s+x.p1,0),pp2=A.cityRows.reduce((s,x)=>s+x.p2,0);
+  const romiOf=(revKzt,sp)=>sp>0?((revKzt/A.rate)-sp)/sp*100:null;
+  const PT=A.payT,romiAll=A.hasPays?romiOf(PT.sum,P.spend):null;
+  const pctS=(a,b)=>b?Math.round(a/b*100)+'%':'—';
   const tiles=[
     ['Лиды',fI(T.leads),(T.leads/A.days).toFixed(1).replace('.',',')+' в день',''],
-    ['План 1 / План 2',fI(pp1)+' / '+fI(pp2),'факт '+(pp1?Math.round(T.leads/pp1*100):0)+'% / '+(pp2?Math.round(T.leads/pp2*100):0)+'%',''],
-    ['Квалы',fI(T.qual),fP(T.qpct)+' · CPQL (FB) '+(P.cpql?fU(P.cpql):'—'),''],
-    ['Продажи',fI(T.sale),fP(T.spct)+' от квалов','good'],
-    ['Выручка (Бюджет)',fM(T.rev)+' млн ₸',fU(T.rev/A.rate),''],
-    ['Расход FB',fU(P.spend),'CPL '+(P.cpl?fU(P.cpl):'—'),''],
-    ...(PAYS?[(()=>{let n=0,sm=0;for(const id in PAYS){const p=PAYS[id];const dt=String(p.date||'').slice(0,10);if(dt&&dt>=A.from&&dt<=A.to){n++;sm+=+p.paid||0;}}return ['Оплачено (факт)',fM(sm)+' млн ₸',n+' сделок по дате оплаты','good'];})()]:[]),
-    ['ROMI платного',P.romi==null?'—':fP(P.romi,0),'CAC '+(P.cac?fU(P.cac):'—')+' · '+fI(P.sale)+' прод.','hi'],
+    [A.calOn?'План (календарь)':'План 1 / План 2',A.calOn?fI(pp1):fI(pp1)+' / '+fI(pp2),'факт '+(pp1?Math.round(T.leads/pp1*100):0)+'%'+(A.calOn?'':' / '+(pp2?Math.round(T.leads/pp2*100):0)+'%'),''],
+    ['Квалы',fI(T.qual),fP(T.qpct)+' · CPQL (FB) '+(P.cpql?fKU(P.cpql):'—'),''],
+    ['Продажи новые (amoCRM)',fI(T.sale),fP(T.spct)+' от квалов · '+fM(T.rev)+' млн ₸','good'],
+    ...(A.hasPays?[['Продажи всего (оплаты)',fI(PT.n),fM(PT.sum)+' млн ₸ · новые '+pctS(PT.newSum,PT.sum)+' · наработки '+pctS(PT.oldSum,PT.sum),'good']]:[]),
+    ['Расход FB',fKU(P.spend),'CPL '+(P.cpl?fKU(P.cpl):'—'),''],
+    ['ROMI новые',P.romi==null?'—':fP(P.romi,0),'платный трафик · CAC '+(P.cac?fKU(P.cac):'—'),'hi'],
+    ...(A.hasPays?[['ROMI общий',romiAll==null?'—':fP(romiAll,0),'все оплаты периода / расход FB'+(PT.n?' · CAC '+fKU(P.spend/PT.n):''),romiAll!=null&&romiAll<0?'bad':'good']]:[]),
   ];
   document.getElementById('kpis').innerHTML=tiles.map(t=>'<div class="kpi'+(t[3]==='hi'?' hi':'')+'"><div class="k">'+t[0]+'</div><div class="v'+(t[3]==='good'?' good':t[3]==='hi'&&P.romi!=null?(P.romi>=0?' good':' bad'):'')+'">'+t[1]+'</div><div class="d">'+t[2]+'</div></div>').join('');
-  document.getElementById('kpiNote').innerHTML=A.R.length?('ROMI платного считает только направления с расходом FB: '+fI(P.leads)+' лидов → '+fI(P.sale)+' продаж → '+fM(P.rev)+' млн ₸ при расходе '+fU(P.spend)+'. '+(PRORATED?'<b>Расход за неполный период оценён пропорционально дням</b>, так как выгрузка FB без разбивки по дням; для точных CPL и ROMI загрузите отчёт Ads Manager с разбивкой «По дням». ':'')+(A.unalloc>0.5?'Ещё '+fU(A.unalloc)+' ушли на кампании без лидов с таким utm_medium ('+esc(A.unallocList.join(', '))+').':'')):'За выбранные даты нет лидов в загруженной выгрузке.';
+  document.getElementById('kpiNote').innerHTML=A.R.length?('ROMI платного считает только направления с расходом FB: '+fI(P.leads)+' лидов → '+fI(P.sale)+' продаж → '+fM(P.rev)+' млн ₸ при расходе '+fKU(P.spend)+'. '+(PRORATED?'<b>Расход за неполный период оценён пропорционально дням</b>, так как выгрузка FB без разбивки по дням; для точных CPL и ROMI загрузите отчёт Ads Manager с разбивкой «По дням». ':'')+(A.unalloc>0.5?'Ещё '+fKUi(A.unalloc)+' ушли на кампании без лидов с таким utm_medium ('+esc(A.unallocList.join(', '))+').':'')):'За выбранные даты нет лидов в загруженной выгрузке.';
   renderDir(A);renderCity(A);renderPlan(A);renderChart(A);renderLeak(A);renderLoss(A);
   document.getElementById('status').innerHTML='<span>Лиды: <b>'+esc(srcAmo)+'</b> · '+fI(LEADS.length)+' сделок</span><span>Расход: <b>'+esc(srcFb)+'</b></span>';
 }
 function renderDir(A){
   if(!A.R.length){document.getElementById('tDir').innerHTML='<div class="empty">Нет лидов за период</div>';return;}
   let h='<table><thead><tr><th class="l">Направление</th><th>Лиды</th><th>Конв. сайта</th><th>Квал</th><th>%квал</th><th>CPQL</th><th>Прод</th><th>%кв→прод</th><th>CAC</th><th>Выручка ₸</th><th>Расход</th><th>CPL</th><th>ROMI</th></tr></thead><tbody>';
-  const row=(name,M,p1,p2,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td class="l">'+esc(name)+'</td><td>'+fI(M.leads)+'</td><td>'+(M.conv==null?dash:fP(M.conv))+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+(M.cpql?fU(M.cpql):dash)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.cac?fU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+(M.spend>0?fU(M.spend):dash)+'</td><td>'+(M.cpl?fU(M.cpl):dash)+'</td><td>'+romiPill(M.romi)+'</td></tr>';
+  const row=(name,M,p1,p2,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td class="l">'+esc(name)+'</td><td>'+fI(M.leads)+'</td><td>'+(M.conv==null?dash:fP(M.conv))+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+(M.cpql?fKU(M.cpql):dash)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.cac?fKU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+(M.spend>0?fKU(M.spend):dash)+'</td><td>'+(M.cpl?fKU(M.cpl):dash)+'</td><td>'+romiPill(M.romi)+'</td></tr>';
   const paid=A.dirs.filter(x=>x.paid),free=A.dirs.filter(x=>!x.paid);
   if(paid.length){h+='<tr class="grp"><td colspan="13"><span class="gl">Платный трафик (Facebook)</span></td></tr>';for(const x of paid)h+=row(x.k,x.M,x.p1,x.p2);
     h+=row('Итого платный',A.paid,paid.reduce((s,x)=>s+x.p1,0),paid.reduce((s,x)=>s+x.p2,0),'total');}
@@ -476,10 +536,53 @@ function renderDir(A){
 function renderCity(A){
   if(!A.econRows.length){document.getElementById('tCity').innerHTML='<div class="empty">Нет данных</div>';return;}
   let h='<table><thead><tr><th class="l">Направление · город</th><th>Лиды</th><th>Квал</th><th>%квал</th><th>Прод</th><th>%кв→прод</th><th>Расход</th><th>CPL</th><th>CPQL</th><th>CAC</th><th>Выручка ₸</th><th>ROMI</th></tr></thead><tbody>';
-  for(const x of A.econRows){const M=x.M;h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(M.leads)+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.spend>0?fU(M.spend):dash)+'</td><td>'+(M.cpl?fU(M.cpl):dash)+'</td><td>'+(M.cpql?fU(M.cpql):dash)+'</td><td>'+(M.cac?fU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+romiPill(M.romi)+'</td></tr>';}
+  for(const x of A.econRows){const M=x.M;h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(M.leads)+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.spend>0?fKU(M.spend):dash)+'</td><td>'+(M.cpl?fKU(M.cpl):dash)+'</td><td>'+(M.cpql?fKU(M.cpql):dash)+'</td><td>'+(M.cac?fKU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+romiPill(M.romi)+'</td></tr>';}
   document.getElementById('tCity').innerHTML=h+'</tbody></table>';
 }
+let PLM=store.get('ia_plm','leads');
 function renderPlan(A){
+  const mk=planMonth();
+  /* верх: продукт по умолчанию, календарь, переключатель показателя */
+  let top='<label style="display:inline-flex;gap:8px;align-items:center;color:var(--ink)">Лиды без данных о продукте относить к <select id="unkSel" class="pin" style="width:auto">'+PRODUCT_LIST.map(x=>'<option'+(x===A.unk?' selected':'')+'>'+x+'</option>').join('')+'</select></label>'+(A.unkCount?' <span class="mut">— за период таких лидов '+fI(A.unkCount)+'</span>':'');
+  if(A.calOn){
+    const ms={};for(const d in A.calWork){const m=d.slice(0,7);ms[m]=1;}
+    const info=Object.keys(ms).map(m=>{const mm=CAL.months&&CAL.months[m];return mm?m.slice(5,7)+'.'+m.slice(0,4)+': рабочих дней '+mm.work+' из '+mm.days:'';}).filter(Boolean).join(' · ');
+    top+='<div class="calinfo">План — из <a href="'+esc(CAL.url||'#')+'" target="_blank" rel="noopener">календаря планов</a>. '+info+'</div>';
+    let strip='<div class="calstrip">';
+    for(let d=A.from;d<=A.to;d=addDays(d,1)){const t=A.calDaily[d]||{};let pl=0;for(const k in t)pl+=t[k].leads;const f=A.daily[d]||0;const w=A.calWork[d];
+      const cls=w===0?'off':pl?(f>=pl?'ok':f>=pl*0.85?'mid':'low'):'';
+      strip+='<div class="cd '+cls+'" title="'+ddmm(d)+(w===0?' · выходной':'')+': факт '+f+' / план '+Math.round(pl)+'"><b>'+d.slice(8,10)+'</b><span>'+f+'</span><i>'+Math.round(pl)+'</i></div>';}
+    top+=strip+'</div>';
+  } else top+='<div class="calinfo mut">Календарь планов не подключён — план берётся из полей ниже (месячный) или авто. Чтобы подключить, запустите iaCreateCalendar в Apps Script.</div>';
+  top+='<div class="presets" id="plmChips" style="margin-top:10px">'+[['leads','Лиды'],['qual','Квалы'],['sale','Продажи'],['rev','Выручка']].map(m=>'<button class="chip'+(PLM===m[0]?' on':'')+'" data-m="'+m[0]+'">'+m[1]+'</button>').join('')+'</div>';
+  if(PLM==='leads'&&!A.calOn){renderPlanManual(A);document.getElementById('planLead').innerHTML=top;return;}
+  document.getElementById('planLead').innerHTML=top;
+  if(!A.cityRows.length){document.getElementById('tPlan').innerHTML='<div class="empty">Нет данных</div>';return;}
+  const isS=PLM==='sale',isR=PLM==='rev',money=isR;
+  const fv=v=>money?fM(v):fI(v);
+  const factOf=x=>{const pr=A.payRow[x.key]||{n:0,sum:0};if(isS)return A.hasPays?pr.n:x.M.sale;if(isR)return A.hasPays?pr.sum:x.M.rev;return x.M[PLM];};
+  let h='<table><thead><tr><th class="l">Продукт · город</th>';
+  if(isS||isR)h+='<th>Новые (amoCRM)</th>'+(A.hasPays?'<th>Оплаты: лиды этого мес.</th><th>Оплаты: лиды прошлых мес.</th><th>Оплаты всего</th>':'');
+  else h+='<th>Факт</th>';
+  h+='<th class="pl">План'+(money?', млн ₸':'')+'</th><th class="pl">/ день</th><th class="pl">% плана</th><th>Откл.</th></tr></thead><tbody>';
+  let cur='';const T={f:0,p:0,nw:0,sm:0,pv:0};
+  for(const x of A.cityRows){
+    if(x.dir!==cur){cur=x.dir;h+='<tr class="grp"><td colspan="9"><span class="gl">'+esc(cur)+'</span></td></tr>';}
+    const pl=x.plan[PLM]||0,f=factOf(x),pr=A.payRow[x.key]||{sameN:0,prevN:0,sameSum:0,prevSum:0,n:0,sum:0};
+    T.f+=f;T.p+=pl;
+    h+='<tr><td class="l">'+esc(x.k)+'</td>';
+    if(isS||isR){const nw=isS?x.M.sale:x.M.rev;T.nw+=nw;h+='<td>'+fv(nw)+'</td>';
+      if(A.hasPays){const sm=isS?pr.sameN:pr.sameSum,pv=isS?pr.prevN:pr.prevSum;T.sm+=sm;T.pv+=pv;h+='<td>'+fv(sm)+'</td><td>'+fv(pv)+'</td><td><b>'+fv(f)+'</b></td>';}}
+    else h+='<td>'+fI(f)+'</td>';
+    h+='<td>'+fv(pl)+'</td><td>'+(money?fM(pl/A.days):(pl/A.days).toFixed(1).replace('.',','))+'</td><td>'+planPill(f,pl)+'</td><td>'+(money?'<span style="color:var('+(f>=pl?'--good':'--bad')+')">'+(f>=pl?'+':'−')+fM(Math.abs(f-pl))+'</span>':dev(f,pl))+'</td></tr>';
+  }
+  h+='<tr class="total"><td class="l">Итого</td>';
+  if(isS||isR){h+='<td>'+fv(T.nw)+'</td>'+(A.hasPays?'<td>'+fv(T.sm)+'</td><td>'+fv(T.pv)+'</td><td>'+fv(T.f)+'</td>':'');}else h+='<td>'+fI(T.f)+'</td>';
+  h+='<td>'+fv(T.p)+'</td><td>'+(money?fM(T.p/A.days):(T.p/A.days).toFixed(1).replace('.',','))+'</td><td>'+planPill(T.f,T.p)+'</td><td>'+(money?fM(T.f-T.p):dev(T.f,T.p))+'</td></tr>';
+  const note=(isS||isR)?(A.hasPays?'Новые — продажи в amoCRM по лидам периода. Оплаты — из таблицы оплат по дате оплаты: «этого мес.» — лид создан в том же месяце, что и оплата; «прошлых мес.» — наработки. % плана считается по оплатам всего.':'Таблица оплат не пришла из API — факт по amoCRM.'):'Факт — по дате создания лида.';
+  document.getElementById('tPlan').innerHTML=h+'</tbody></table><p class="note" style="padding:8px 12px">'+note+(A.calOn?'':' План квалов, продаж и выручки без календаря — авто: план лидов × конверсии строки за месяц.')+'</p>';
+}
+function renderPlanManual(A){
   const mk=planMonth();
   document.getElementById('planLead').innerHTML='<label style="display:inline-flex;gap:8px;align-items:center;margin-bottom:6px;color:var(--ink)">Лиды без данных о продукте относить к <select id="unkSel" class="pin" style="width:auto">'+PRODUCT_LIST.map(x=>'<option'+(x===A.unk?' selected':'')+'>'+x+'</option>').join('')+'</select></label>'+(A.unkCount?' <span class="mut">— за период таких лидов '+fI(A.unkCount)+'</span>':'')+'<br>Впишите месячный план по каждой строке — он сохранится для <b>'+mk.slice(5,7)+'.'+mk.slice(0,4)+'</b> и следующих месяцев, пока не поменяете. Пустая ячейка = авто: общий план '+fI(A.p1)+' / '+fI(A.p2)+' × доля строки в лидах. План периода = месячный × '+A.days+' дн. / дни месяца. Итог плана = карточка «План 1 / План 2» наверху.';
   if(!A.cityRows.length){document.getElementById('tPlan').innerHTML='<div class="empty">Нет данных</div>';return;}
@@ -494,6 +597,7 @@ function renderPlan(A){
   const anyMan=A.cityRows.some(x=>x.man1!=null||x.man2!=null);
   document.getElementById('tPlan').innerHTML=h+'</tbody></table><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px"><p class="note" style="margin:0">В таблице все лиды периода. Лиды платных кампаний — в направлении кампании; лиды из директа, органики, social и других каналов без расхода — в продукте по полю «Курс», форме, ссылке сделки, тегам, языку или анкете, и в городе лида. Лиды совсем без данных о продукте — в продукт, выбранный выше. ТЗ_Кар_Шым входит в ТЗ (города Караганда и Шымкент). Итог совпадает с карточкой «Лиды». Планы хранятся в этом браузере.</p>'+(anyMan?'<button class="btn" id="bResetPlan">Сбросить ручные планы за '+mk.slice(5,7)+'.'+mk.slice(0,4)+'</button>':'')+'</div>';
 }
+document.getElementById('planLead').addEventListener('click',e=>{const b=e.target.closest('#plmChips .chip');if(!b)return;PLM=b.dataset.m;store.set('ia_plm',PLM);if(LAST)renderPlan(LAST);});
 document.getElementById('planLead').addEventListener('change',e=>{if(e.target.id!=='unkSel')return;ST.unk=e.target.value;store.set('ia_unk',ST.unk);render();});
 document.getElementById('tPlan').addEventListener('change',e=>{const t=e.target;if(!t.classList||!t.classList.contains('pin'))return;
   const v=parseFloat(String(t.value).replace(',','.'));setCityPlan(planMonth(),t.dataset.key,t.dataset.f,v>0?v:null);
@@ -504,23 +608,26 @@ document.getElementById('tPlan').addEventListener('click',e=>{if(e.target.id!=='
   /* сбросить = записать пустые значения на этот месяц, чтобы не подтягивались прошлые */
   all[mk]={};for(const x of (LAST?LAST.cityRows:[]))all[mk][x.key]={p1:null,p2:null};store.set('ia_cityplan',all);render();});
 let DYN={seg:store.get('ia_dseg','all'),met:store.get('ia_dmet','leads'),gran:store.get('ia_dgran','day')};
-const DMET={leads:['Лиды · CPL','leads','cpl','лиды','CPL, $'],qual:['Квалы · CPQL','qual','cpql','квалы','CPQL, $'],sale:['Продажи · CAC','sale','cac','продажи','CAC, $'],rev:['Выручка · ROMI','rev','romi','выручка, млн ₸','ROMI, %']};
+const DMET={leads:['Лиды · CPL','leads','cpl','лиды','CPL, ₸'],qual:['Квалы · CPQL','qual','cpql','квалы','CPQL, ₸'],sale:['Продажи · CAC','sale','cac','продажи','CAC, ₸'],rev:['Выручка новых · ROMI','rev','romi','выручка новых, млн ₸','ROMI новые, %'],pn:['Продажи всего (оплаты) · CAC','pn','cacAll','оплаты, шт','CAC общий, ₸'],ps:['Оплаты, сумма · ROMI общий','ps','romiAll','оплаты, млн ₸','ROMI общий, %']};
 function dynBuckets(A,gran){const out=[];if(gran==='week'){let s=A.from;while(s<=A.to){let e=s;while(e<A.to&&new Date(e+'T00:00:00Z').getUTCDay()!==0)e=addDays(e,1);out.push([s,e,ddmm(s).slice(0,5)+'–'+ddmm(e).slice(0,5)]);s=addDays(e,1);}}
   else for(let d=A.from;d<=A.to;d=addDays(d,1))out.push([d,d,ddmm(d).slice(0,5)]);return out;}
 function dynSet(A){if(DYN.seg==='all')return null;if(DYN.seg.startsWith('p:')){const d=DYN.seg.slice(2);return new Set(A.cityRows.filter(x=>x.dir===d).map(x=>x.key));}return new Set([DYN.seg]);}
+function dynM(o,rate){const m=metr(o,rate);m.pn=o.pn||0;m.ps=o.ps||0;m.cacAll=o.spend>0&&m.pn?o.spend/m.pn:null;m.romiAll=o.spend>0?((m.ps/rate)-o.spend)/o.spend*100:null;return m;}
 function dynData(A){
   const set=dynSet(A),inSeg=k=>!set||set.has(k);
   const share={};for(const mn in A.medRow){let n=0;for(const k in A.medRow[mn])if(inSeg(k))n+=A.medRow[mn][k];share[mn]=A.medN[mn]?n/A.medN[mn]:0;}
   const planDay=A.cityRows.filter(x=>inSeg(x.key)).reduce((t,x)=>t+x.p1,0)/A.days;
+  const calPlan=(b0,b1)=>{let t=0;for(let d=b0;d<=b1;d=addDays(d,1)){const z=A.calDaily[d];if(z)for(const k in z)if(inSeg(k))t+=z[k].leads;}return t;};
   const rows=[],T=blank();
   for(const [b0,b1,lbl] of dynBuckets(A,DYN.gran)){
     const o=blank();
     A.R.forEach((r,i)=>{if(r.d<b0||r.d>b1||!inSeg(A.leadRows[i]))return;const cl=classify(r);o.leads++;if(cl.qual)o.qual++;if(cl.sale){o.sale++;o.rev+=r.b;}});
     const fb=fbForRange(b0,b1);for(const mn in share){if(fb[mn])o.spend+=fb[mn].spend*share[mn];}
-    for(const f of ['leads','qual','sale','rev','spend'])T[f]+=o[f];
-    rows.push({lbl,b0,b1,M:metr(o,A.rate),plan:planDay*daysBetween(b0,b1)});
+    o.pn=0;o.ps=0;for(const x of A.pays){if(x.dt>=b0&&x.dt<=b1&&inSeg(x.row)){o.pn++;o.ps+=x.sum;}}
+    for(const f of ['leads','qual','sale','rev','spend','pn','ps'])T[f]=(T[f]||0)+o[f];
+    rows.push({lbl,b0,b1,M:dynM(o,A.rate),plan:A.calOn?calPlan(b0,b1):planDay*daysBetween(b0,b1)});
   }
-  return {rows,T:metr(T,A.rate),plan:planDay*A.days};
+  return {rows,T:dynM(T,A.rate),plan:A.calOn?calPlan(A.from,A.to):planDay*A.days};
 }
 function renderDynControls(A){
   const sel=document.getElementById('dynSeg');
@@ -530,13 +637,14 @@ function renderDynControls(A){
   for(const d of prods){h+='<optgroup label="'+esc(d)+'"><option value="p:'+esc(d)+'"'+(DYN.seg==='p:'+d?' selected':'')+'>'+esc(d)+' — все города</option>';
     for(const x of A.cityRows.filter(r=>r.dir===d))h+='<option value="'+esc(x.key)+'"'+(DYN.seg===x.key?' selected':'')+'>'+esc(x.k)+'</option>';h+='</optgroup>';}
   sel.innerHTML=h;
-  document.getElementById('dynMet').innerHTML=Object.keys(DMET).map(k=>'<button class="chip'+(DYN.met===k?' on':'')+'" data-m="'+k+'">'+DMET[k][0]+'</button>').join('');
+  document.getElementById('dynMet').innerHTML=Object.keys(DMET).filter(k=>A.hasPays||(k!=='pn'&&k!=='ps')).map(k=>'<button class="chip'+(DYN.met===k?' on':'')+'" data-m="'+k+'">'+DMET[k][0]+'</button>').join('');
   document.getElementById('dynGran').innerHTML=[['day','По дням'],['week','По неделям']].map(g=>'<button class="chip'+(DYN.gran===g[0]?' on':'')+'" data-g="'+g[0]+'">'+g[1]+'</button>').join('');
 }
 function renderChart(A){
   renderDynControls(A);
-  const D=dynData(A),cfg=DMET[DYN.met],isRev=DYN.met==='rev';
-  const bars=D.rows.map(x=>isRev?x.M.rev/1e6:x.M[cfg[1]]),line=D.rows.map(x=>x.M[cfg[2]]);
+  if(!A.hasPays&&(DYN.met==='pn'||DYN.met==='ps'))DYN.met='sale';
+  const D=dynData(A),cfg=DMET[DYN.met],isRev=DYN.met==='rev'||DYN.met==='ps',isPct=DYN.met==='rev'||DYN.met==='ps';
+  const bars=D.rows.map(x=>isRev?x.M[cfg[1]]/1e6:x.M[cfg[1]]),line=D.rows.map(x=>{const v=x.M[cfg[2]];return v==null?null:(isPct?v:v*A.rate);});
   const showPlan=DYN.met==='leads';
   document.getElementById('dynLegend').innerHTML='<span><i style="background:var(--accent)"></i>'+cfg[3]+'</span><span><i style="background:var(--plan)"></i>'+cfg[4]+' (правая шкала)</span>'+(showPlan?'<span><i style="background:var(--muted)"></i>План 1</span>':'');
   const n=D.rows.length;
@@ -548,7 +656,7 @@ function renderChart(A){
     const maxL=niceUp(Math.max(0,...bars,...plans));const lv=line.filter(v=>v!=null);const maxR=niceUp(Math.max(1,...lv.map(Math.abs)));const minR=Math.min(0,...lv)<0?-niceUp(Math.abs(Math.min(0,...lv))):0;
     const yL=v=>Tm+ih-v/maxL*ih, yR=v=>Tm+ih-(v-minR)/(maxR-minR)*ih;
     const fmtL=v=>isRev?(+v.toFixed(1)).toLocaleString('ru-RU'):Math.round(v).toLocaleString('ru-RU');
-    const fmtR=v=>DYN.met==='rev'?Math.round(v)+'%':'$'+(v>=100?Math.round(v):(+v.toFixed(1)));
+    const fmtR=v=>isPct?Math.round(v)+'%':Math.round(v).toLocaleString('ru-RU')+' ₸';
     let s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Динамика">';
     for(let i=0;i<=4;i++){const yy=Tm+ih-ih*i/4;s+='<line x1="'+L+'" x2="'+(W-Rm)+'" y1="'+yy+'" y2="'+yy+'" stroke="var(--border2)"/><text x="'+(L-6)+'" y="'+(yy+4)+'" text-anchor="end">'+fmtL(maxL*i/4)+'</text><text x="'+(W-Rm+6)+'" y="'+(yy+4)+'" fill="var(--plan)" style="fill:var(--plan)">'+fmtR(minR+(maxR-minR)*i/4)+'</text>';}
     D.rows.forEach((x,i)=>{const v=bars[i],yy=yL(v);s+='<rect x="'+(L+i*bw+bw*0.15).toFixed(1)+'" y="'+yy.toFixed(1)+'" width="'+(bw*0.7).toFixed(1)+'" height="'+Math.max(0,Tm+ih-yy).toFixed(1)+'" rx="2" fill="var(--accent)"><title>'+x.lbl+': '+cfg[3]+' '+fmtL(v)+(line[i]!=null?' · '+cfg[4]+' '+fmtR(line[i]):'')+'</title></rect>';
@@ -559,8 +667,8 @@ function renderChart(A){
     line.forEach((v,i)=>{if(v!=null)s+='<circle cx="'+(L+i*bw+bw/2).toFixed(1)+'" cy="'+yR(v).toFixed(1)+'" r="3" fill="var(--plan)"><title>'+D.rows[i].lbl+': '+cfg[4]+' '+fmtR(v)+'</title></circle>';});
     document.getElementById('chart').innerHTML=s+'</svg>';
   }
-  let h='<table><thead><tr><th class="l">'+(DYN.gran==='week'?'Неделя':'День')+'</th><th>Лиды</th><th class="pl">План 1</th><th>CPL</th><th>Квал</th><th>%квал</th><th>CPQL</th><th>Продажи</th><th>CAC</th><th>Выручка ₸</th><th>Расход</th><th>ROMI</th></tr></thead><tbody>';
-  const tr=(lbl,M,pl,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td class="l">'+lbl+'</td><td>'+fI(M.leads)+'</td><td>'+fI(pl)+'</td><td>'+(M.cpl?fU(M.cpl):dash)+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+(M.cpql?fU(M.cpql):dash)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.cac?fU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+(M.spend>0?fU(M.spend):dash)+'</td><td>'+romiPill(M.romi)+'</td></tr>';
+  let h='<table><thead><tr><th class="l">'+(DYN.gran==='week'?'Неделя':'День')+'</th><th>Лиды</th><th class="pl">План</th><th>CPL</th><th>Квал</th><th>%квал</th><th>CPQL</th><th>Продажи новые</th><th>CAC</th><th>Выручка новых ₸</th>'+(A.hasPays?'<th>Оплаты, шт</th><th>Оплаты ₸</th>':'')+'<th>Расход</th><th>ROMI новые</th>'+(A.hasPays?'<th>ROMI общий</th>':'')+'</tr></thead><tbody>';
+  const tr=(lbl,M,pl,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td class="l">'+lbl+'</td><td>'+fI(M.leads)+'</td><td>'+fI(pl)+'</td><td>'+(M.cpl?fKU(M.cpl):dash)+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+(M.cpql?fKU(M.cpql):dash)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.cac?fKU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td>'+(A.hasPays?'<td>'+fI(M.pn)+'</td><td>'+fI(M.ps)+'</td>':'')+'<td>'+(M.spend>0?fKU(M.spend):dash)+'</td><td>'+romiPill(M.romi)+'</td>'+(A.hasPays?'<td>'+romiPill(M.romiAll)+'</td>':'')+'</tr>';
   for(const x of D.rows)h+=tr(x.lbl,x.M,x.plan);
   h+=tr('Итого',D.T,D.plan,'total');
   document.getElementById('tDyn').innerHTML=h+'</tbody></table>';
@@ -569,8 +677,8 @@ function renderChart(A){
 document.getElementById('dynSeg').addEventListener('change',e=>{DYN.seg=e.target.value;store.set('ia_dseg',DYN.seg);if(LAST)renderChart(LAST);});
 document.getElementById('dynMet').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;DYN.met=b.dataset.m;store.set('ia_dmet',DYN.met);if(LAST)renderChart(LAST);});
 document.getElementById('dynGran').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;DYN.gran=b.dataset.g;store.set('ia_dgran',DYN.gran);if(LAST)renderChart(LAST);});
-function renderLeak(A){
-  if(!A.fcols.length){document.getElementById('tLeak').innerHTML='<div class="empty">Нет продаж за период</div>';return;}
+function renderLeakOld(A){
+  if(!A.fcols.length){document.getElementById('tLeakOld').innerHTML='<div class="empty">Нет продаж за период</div>';return;}
   let h='<table><thead><tr><th class="l">Реклама \\ продано</th>'+A.fcols.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>Всего</th></tr></thead><tbody>';
   const colT={};let all=0,allR=0;
   for(const a of A.leakRows){let n=0,rv=0;let cells='';
@@ -578,17 +686,54 @@ function renderLeak(A){
       cells+='<td'+(a===f?' class="diag"':'')+'>'+(o?o.n+' · '+fM(o.rev):'<span class="mut">·</span>')+'</td>';}
     if(!n)continue;all+=n;allR+=rv;h+='<tr><td class="l">'+esc(a)+'</td>'+cells+'<td>'+n+' · '+fM(rv)+'</td></tr>';}
   h+='<tr class="total"><td class="l">Всего продано</td>'+A.fcols.map(f=>'<td>'+(colT[f]?colT[f].n+' · '+fM(colT[f].rev):'·')+'</td>').join('')+'<td>'+all+' · '+fM(allR)+'</td></tr>';
-  document.getElementById('tLeak').innerHTML=h+'</tbody></table>';
+  document.getElementById('tLeakOld').innerHTML=h+'</tbody></table>';
 }
+let LEAKM=store.get('ia_leakm')||'leads';
+function renderLeak(A){
+  renderLeakOld(A);
+  document.querySelectorAll('#leakMet .chip').forEach(b=>b.classList.toggle('on',b.dataset.m===LEAKM));
+  const el=document.getElementById('tLeak');
+  if(!A.R.length){el.innerHTML='<div class="empty">Нет лидов за период</div>';return;}
+  const m=LEAKM,fv=v=>m==='rev'?fM(v):fI(v);
+  const cols=A.leakRows.filter(a=>A.cityRows.some(x=>A.leak2[x.key]&&A.leak2[x.key][a]&&A.leak2[x.key][a].leads));
+  let h='<table><thead><tr><th class="l">Продукт · город \\ реклама</th>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>Всего</th><th>Из «своей» рекламы</th></tr></thead><tbody>';
+  const colT={};let all=0,allOwn=0;
+  for(const x of A.cityRows){const o=A.leak2[x.key];if(!o)continue;const n=cols.reduce((t,a)=>t+((o[a]||{})[m]||0),0);if(!n&&!(cols.some(a=>(o[a]||{}).leads)))continue;
+    const prod=x.dir;let own=0;
+    const cells=cols.map(a=>{const v=(o[a]||{})[m]||0;colT[a]=(colT[a]||0)+v;const diag=(a===prod)||(a==='ТЗ_Кар_Шым'&&prod==='ТЗ');if(diag)own+=v;
+      return '<td'+(diag?' class="diag"':'')+'>'+(v?fv(v)+' <small class="mut">'+Math.round(v/(n||1)*100)+'%</small>':'<span class="mut">·</span>')+'</td>';}).join('');
+    all+=n;allOwn+=own;
+    h+='<tr><td class="l">'+esc(x.k)+'</td>'+cells+'<td><b>'+fv(n)+'</b></td><td>'+(n?fP(own/n*100,0):dash)+'</td></tr>';}
+  h+='<tr class="total"><td class="l">Итого</td>'+cols.map(a=>'<td>'+fv(colT[a]||0)+' <small class="mut">'+(all?Math.round((colT[a]||0)/all*100):0)+'%</small></td>').join('')+'<td>'+fv(all)+'</td><td>'+(all?fP(allOwn/all*100,0):dash)+'</td></tr>';
+  el.innerHTML=h+'</tbody></table>';
+}
+document.getElementById('leakMet').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;LEAKM=b.dataset.m;store.set('ia_leakm',LEAKM);if(LAST)renderLeak(LAST);});
 function renderLoss(A){
+  const N=A.R.length||1;
   document.getElementById('lossTitle').textContent='Куда уходят '+fI(A.R.length)+' лидов';
   const arr=Object.keys(A.loss).map(k=>({k,...A.loss[k]})).sort((a,b)=>b.n-a.n).slice(0,12);
   const mx=arr.length?arr[0].n:1;
-  document.getElementById('lossBars').innerHTML=arr.length?arr.map(x=>'<div class="brow"><span class="lbl" title="'+esc(x.k)+'">'+esc(x.k)+'</span><div class="track"><div class="fill '+x.t+'" style="width:'+(x.n/mx*100).toFixed(1)+'%"></div></div><span class="n">'+fI(x.n)+'</span></div>').join(''):'<div class="empty">Нет данных</div>';
+  const pc=n=>' <small class="mut">'+fP(n/N*100)+'</small>';
+  document.getElementById('lossBars').innerHTML=arr.length?arr.map(x=>'<div class="brow"><span class="lbl" title="'+esc(x.k)+'">'+esc(x.k)+'</span><div class="track"><div class="fill '+x.t+'" style="width:'+(x.n/mx*100).toFixed(1)+'%"></div></div><span class="n">'+fI(x.n)+pc(x.n)+'</span></div>').join(''):'<div class="empty">Нет данных</div>';
   const q=[['Закрыты с «квальной» причиной',A.qClosed,'q'],['Продажа',A.qSale,'s'],['Ещё в работе',A.qWork,'a']];const qm=Math.max(1,...q.map(x=>x[1]));
-  document.getElementById('qualBars').innerHTML=q.map(x=>'<div class="brow"><span class="lbl">'+x[0]+'</span><div class="track"><div class="fill '+x[2]+'" style="width:'+(x[1]/qm*100).toFixed(1)+'%"></div></div><span class="n">'+fI(x[1])+'</span></div>').join('');
+  document.getElementById('qualBars').innerHTML=q.map(x=>'<div class="brow"><span class="lbl">'+x[0]+'</span><div class="track"><div class="fill '+x[2]+'" style="width:'+(x[1]/qm*100).toFixed(1)+'%"></div></div><span class="n">'+fI(x[1])+pc(x[1])+'</span></div>').join('');
   const qt=A.qClosed+A.qSale+A.qWork;
-  document.getElementById('qualNote').textContent=qt?Math.round(A.qClosed/qt*100)+'% квалов уже закрыты без оплаты. Из «квальных» отказов «В следующий раз» и «Гасится» — база для дожима под следующий поток.':'';
+  document.getElementById('qualNote').textContent=qt?'Квалы — '+fP(qt/N*100)+' всех лидов. '+Math.round(A.qClosed/qt*100)+'% квалов уже закрыты без оплаты; «В следующий раз» и «Гасится» — база для дожима.':'';
+  /* в работе по этапам × строки плана */
+  const work={},stCount={},rowTot={};
+  A.R.forEach((r,i)=>{const k=A.leadRows[i];rowTot[k]=(rowTot[k]||0)+1;const b=baseStage(r.st);if(b==='закрыто и не реализовано'||SS.has(b))return;
+    const st=r.st.trim()||'(без этапа)';stCount[st]=(stCount[st]||0)+1;const o=work[k]||(work[k]={});o[st]=(o[st]||0)+1;});
+  const sts=Object.keys(stCount).sort((a,b)=>stCount[b]-stCount[a]);
+  if(!sts.length){document.getElementById('tWork').innerHTML='<div class="empty">Нет лидов в работе</div>';A.work=null;return;}
+  let h='<table><thead><tr><th class="l">Продукт · город</th><th>Лидов</th><th>В работе</th>'+sts.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>';
+  let cur='';const cell=(n,t)=>n?fI(n)+' <small class="mut">'+fP(n/t*100,0)+'</small>':'<span class="mut">·</span>';
+  for(const x of A.cityRows){const o=work[x.key]||{},t=rowTot[x.key]||0;if(!t)continue;const w=Object.values(o).reduce((a,b)=>a+b,0);
+    if(x.dir!==cur){cur=x.dir;h+='<tr class="grp"><td colspan="'+(sts.length+3)+'"><span class="gl">'+esc(cur)+'</span></td></tr>';}
+    h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(t)+'</td><td><b>'+cell(w,t)+'</b></td>'+sts.map(st=>'<td>'+cell(o[st]||0,t)+'</td>').join('')+'</tr>';}
+  const W=sts.reduce((a,st)=>a+stCount[st],0);
+  h+='<tr class="total"><td class="l">Итого</td><td>'+fI(A.R.length)+'</td><td>'+cell(W,A.R.length)+'</td>'+sts.map(st=>'<td>'+cell(stCount[st],A.R.length)+'</td>').join('')+'</tr>';
+  document.getElementById('tWork').innerHTML=h+'</tbody></table>';
+  A.work={sts,work,rowTot,stCount};
 }
 
 /* ===== период ===== */
@@ -627,6 +772,7 @@ function toISO(s){s=String(s||'').trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})
 function parseNum(v){if(typeof v==='number')return v;let s=String(v==null?'':v).replace(/\s/g,'').trim();if(!s||s==='-')return 0;if(s.includes('.')&&s.includes(','))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');else if(s.includes(','))s=s.replace(',','.');s=s.replace(/[^0-9.\-]/g,'');return parseFloat(s)||0;}
 function amoRecords(rows){
   if(!rows.length)return [];const H=Object.keys(rows[0]);
+  const cId=pick(H,['id']);
   const cStage=pick(H,['этап сделки','этап']),cReason=pick(H,['причина отказа','причина']),cBud=pick(H,['бюджет']),cMed=pick(H,['utm_medium']),cCmp=pick(H,['utm_campaign']),cSrc=pick(H,['utm_source']),cForm=pick(H,['formname']),cCrs=pick(H,['курс']),cDate=pick(H,['дата создания','дата']),cTags=pick(H,['теги','тэги','tags']);
   if(!cStage||!cMed||!cDate)throw new Error('Не нашёл колонки «Этап сделки», «utm_medium» и «Дата создания сделки». Это выгрузка сделок amoCRM?');
   const cNm=pick(H,['название сделки']),cRef=pick(H,['referer','utm_referrer']),cGym=pick(H,['ходит ли в зал']);
@@ -635,7 +781,7 @@ function amoRecords(rows){
   return rows.map(r=>{const first=cols=>{for(const c of cols){const v=String(r[c]||'').trim();if(v)return v;}return '';};
     let m=String(r[cMed]||'').trim();const cmp=String(cCmp?r[cCmp]||'':'').trim(),src=String(cSrc?r[cSrc]||'':'').trim(),tags=String(cTags?r[cTags]||'':'').trim();
     if(!m&&!cmp&&!src&&!tags)m='Сарафанка';
-    return {d:toISO(r[cDate]),st:String(r[cStage]||''),rs:String(cReason?r[cReason]||'':''),b:parseFloat(String(cBud?r[cBud]||'0':'0').replace(/[^\d.]/g,''))||0,m,cmp,src,c:first(cityCols),l:first(langCols),fn:String(cForm?r[cForm]||'':''),crs:String(cCrs?r[cCrs]||'':''),tags,nm:String(cNm?r[cNm]||'':''),ref:String(cRef?r[cRef]||'':''),gym:String(cGym?r[cGym]||'':'')};}).filter(r=>r.d);
+    return {id:String(cId?r[cId]||'':'').replace(/\.0$/,''),d:toISO(r[cDate]),st:String(r[cStage]||''),rs:String(cReason?r[cReason]||'':''),b:parseFloat(String(cBud?r[cBud]||'0':'0').replace(/[^\d.]/g,''))||0,m,cmp,src,c:first(cityCols),l:first(langCols),fn:String(cForm?r[cForm]||'':''),crs:String(cCrs?r[cCrs]||'':''),tags,nm:String(cNm?r[cNm]||'':''),ref:String(cRef?r[cRef]||'':''),gym:String(cGym?r[cGym]||'':'')};}).filter(r=>r.d);
 }
 function fbRecords(rows){
   if(!rows.length)return [];const H=Object.keys(rows[0]);
@@ -677,11 +823,15 @@ function buildWorkbook(){
   const l=[['Что рекламировали → что продали · '+per],['Реклама \\ продано'].concat(A.fcols.map(f=>f+', прод')).concat(['Всего прод']).concat(A.fcols.map(f=>f+', ₸')).concat(['Всего ₸'])];
   for(const a of A.leakRows){const ns=A.fcols.map(f=>(A.leak[a+'|'+f]||{}).n||0),rs=A.fcols.map(f=>(A.leak[a+'|'+f]||{}).rev||0);const n=ns.reduce((s,x)=>s+x,0);if(!n)continue;l.push([a].concat(ns,[n],rs,[rs.reduce((s,x)=>s+x,0)]));}
   add('Утечка',l,[34].concat(Array(A.fcols.length*2+2).fill(12)));
+  const met=[['leads','Лиды'],['qual','Квалы'],['sale','Продажи'],['rev','Выручка ₸']];
+  const l2=[['Утечка по продукту·городу · '+per],['Продукт · город','Метрика'].concat(A.leakRows).concat(['Всего'])];
+  for(const x of A.cityRows){const o=A.leak2[x.key];if(!o)continue;for(const [mk,ml] of met){const vs=A.leakRows.map(a=>Math.round((o[a]||{})[mk]||0));l2.push([x.k,ml].concat(vs,[vs.reduce((t,v)=>t+v,0)]));}}
+  add('Утечка по городам',l2,[30,12].concat(Array(A.leakRows.length+1).fill(12)));
   const lo=[['Этапы и причины закрытия · '+per],['Этап / причина','Лидов','Доля %','Тип']];const tl={q:'квал',x:'мусор / недозвон',s:'продажа','':''};
   Object.keys(A.loss).map(k=>({k,...A.loss[k]})).sort((a,b)=>b.n-a.n).forEach(x=>lo.push([x.k,x.n,r1(x.n/A.R.length*100),tl[x.t]]));add('Потери',lo,[44,10,10,18]);
   {const D=LAST.dyn||dynData(A);const segName=DYN.seg==='all'?'Все лиды':DYN.seg.startsWith('p:')?DYN.seg.slice(2)+' — все города':((A.cityRows.find(x=>x.key===DYN.seg)||{}).k||DYN.seg);
-  const dd=[['Динамика · '+segName+' · '+per],[DYN.gran==='week'?'Неделя':'День','Лиды','План 1','CPL $','Квал','%квал','CPQL $','Продажи','CAC $','Выручка ₸','Расход $','ROMI %']];
-  for(const x of D.rows.concat([{lbl:'Итого',M:D.T,plan:D.plan}])){const M=x.M;dd.push([x.lbl,M.leads,Math.round(x.plan),r2(M.cpl),M.qual,r1(M.qpct),r2(M.cpql),M.sale,r2(M.cac),Math.round(M.rev),r2(M.spend),r1(M.romi)]);}
+  const dd=[['Динамика · '+segName+' · '+per],[DYN.gran==='week'?'Неделя':'День','Лиды','План','CPL ₸','Квал','%квал','CPQL ₸','Продажи новые','CAC ₸','Выручка новых ₸','Оплаты, шт','Оплаты ₸','Расход ₸','Расход $','ROMI новые %','ROMI общий %']];
+  for(const x of D.rows.concat([{lbl:'Итого',M:D.T,plan:D.plan}])){const M=x.M;const k=v=>v==null?'':Math.round(v*A.rate);dd.push([x.lbl,M.leads,Math.round(x.plan),k(M.cpl),M.qual,r1(M.qpct),k(M.cpql),M.sale,k(M.cac),Math.round(M.rev),M.pn||0,Math.round(M.ps||0),k(M.spend),r2(M.spend),r1(M.romi),r1(M.romiAll)]);}
   add('Динамика',dd,[14,8,9,9,8,8,9,9,9,13,11,9]);}
   const f=[['Расход FB за период · '+per],['Кампания (= utm_medium)','Направление','Расход $','Показы','Клики','CTR %','CPC $','Лиды amo']];
   let s=0;for(const x of A.fbRows){s+=x.spend;f.push([x.name,x.dir,r2(x.spend),Math.round(x.impr),Math.round(x.clicks),x.impr?r2(x.clicks/x.impr*100):'',x.clicks?r2(x.spend/x.clicks):'',x.leads]);}
