@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Invictus · аналитика лидов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: sticky period bar on top, KPI tiles, then direction → city → plan → leakage → losses → daily chart. Same visual language as the «Разбор направлений» tool. */
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --surface2:#f8fafb; --ink:#161a20; --muted:#5f6a79;
+  --border:#e2e7ed; --border2:#eef1f5;
+  --accent:#e35d2b; --accent-soft:#fdeee7;
+  --good:#1a8f55; --good-soft:#e5f4ec; --warn:#b97510; --warn-soft:#fbf1df; --bad:#c9443a; --bad-soft:#fbeae8;
+  --bar:#c9d1db; --plan:#2f6fd0;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1116; --surface:#161b22; --surface2:#1b2129; --ink:#e7ebf0; --muted:#97a3b3;
+  --border:#29303a; --border2:#20272f; --accent:#ff7c47; --accent-soft:#2c1b12;
+  --good:#3bc47f; --good-soft:#12261c; --warn:#e0a13c; --warn-soft:#2a210f; --bad:#f0685a; --bad-soft:#2c1613; --bar:#3a4452; --plan:#6ea4ff; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1116; --surface:#161b22; --surface2:#1b2129; --ink:#e7ebf0; --muted:#97a3b3;
+  --border:#29303a; --border2:#20272f; --accent:#ff7c47; --accent-soft:#2c1b12;
+  --good:#3bc47f; --good-soft:#12261c; --warn:#e0a13c; --warn-soft:#2a210f; --bad:#f0685a; --bad-soft:#2c1613; --bar:#3a4452; --plan:#6ea4ff; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:24px 64px;display:flex;flex-direction:column;gap:26px}
+header{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:12px;align-items:center}
+.mark{width:42px;height:42px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:700 18px var(--f-display);letter-spacing:.5px;flex:none}
+h1{font:700 28px/1.1 var(--f-display);margin:0;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font:500 13.5px var(--f-body);cursor:pointer;position:relative}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;box-shadow:0 4px 18px rgba(20,26,32,.06)}
+.fld{display:flex;flex-direction:column;gap:3px;min-width:0}
+.fld label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.fld input{padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--ink);font:500 14px var(--f-body);font-variant-numeric:tabular-nums}
+.fld input[type=number]{width:96px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:6px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--ink);font:500 12.5px var(--f-body);cursor:pointer}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.sep{width:1px;align-self:stretch;background:var(--border2)}
+.status{font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.status b{color:var(--ink);font-weight:600}
+.msg{font-size:13px;padding:10px 12px;border-radius:9px;background:var(--surface2);border:1px solid var(--border)}
+.msg.ok{background:var(--good-soft);border-color:transparent;color:var(--good)}
+.msg.err{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.msg a{color:inherit;font-weight:600}
+h2{font:700 21px/1.2 var(--f-display);margin:0;text-wrap:balance}
+.eyebrow{font:600 11.5px var(--f-body);text-transform:uppercase;letter-spacing:.09em;color:var(--accent)}
+section{display:flex;flex-direction:column;gap:10px;min-width:0}
+.lead{max-width:80ch;color:var(--muted);margin:0;font-size:14px}
+.note{font-size:12.5px;color:var(--muted);max-width:95ch;margin:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.kpi .v{white-space:nowrap;font:700 23px/1.15 var(--f-display);font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.kpi.hi{border-color:var(--accent);background:var(--accent-soft)}
+.v.good{color:var(--good)} .v.bad{color:var(--bad)}
+.tscroll{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border2)}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--surface2)}
+th.l,td.l{text-align:left}
+th.pl{color:var(--plan)}
+tr.total td{font-weight:600;background:var(--surface2);border-bottom:0}
+tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;text-align:left;font-weight:600}
+.mut{color:var(--muted)}
+.pill{display:inline-block;padding:1px 8px;border-radius:20px;font-weight:600;font-size:12.5px}
+.pill.g{background:var(--good-soft);color:var(--good)} .pill.w{background:var(--warn-soft);color:var(--warn)} .pill.b{background:var(--bad-soft);color:var(--bad)}
+.diag{font-weight:700}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:760px){.split{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;min-width:0}
+.panel h3{font:600 15px var(--f-body);margin:0 0 10px}
+.bars{display:flex;flex-direction:column;gap:7px}
+.brow{display:grid;grid-template-columns:minmax(110px,220px) 1fr 52px;gap:10px;align-items:center;font-size:13.5px}
+.brow .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .track{height:12px;background:var(--surface2);border-radius:6px;overflow:hidden}
+.brow .fill{height:100%;background:var(--bar);border-radius:6px}
+.fill.q{background:var(--warn)} .fill.x{background:var(--bad)} .fill.s{background:var(--good)} .fill.a{background:var(--accent)}
+.brow .n{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.chart{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 12px 6px;overflow-x:auto}
+.chart svg{display:block;min-width:520px;max-width:none}
+.chart text{font-family:var(--f-body);font-size:11px;fill:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="brand"><div class="mark">IA</div>
+    <div><h1>Invictus · аналитика лидов</h1><div class="sub">Воронка amoCRM + расход Facebook за выбранный период · данные из API · <a href="./" style="color:inherit">← инструмент</a></div></div></div>
+  <div class="actions">
+    <button class="btn" id="bSync" title="Заново забрать данные из amoCRM и Facebook за месяц(ы) выбранного периода">🔄 Свежие данные</button>
+    <label class="btn" title="Вместо API — загрузить выгрузку сделок вручную">⬆ amoCRM файл<input type="file" id="fAmo" accept=".csv,.xlsx,.xls"></label>
+    <label class="btn" title="Вместо API — загрузить выгрузку Ads Manager вручную">⬆ FB файл<input type="file" id="fFb" accept=".csv,.xlsx,.xls"></label>
+    <button class="btn" id="bXlsx">⬇ Скачать XLSX</button>
+    <button class="btn primary" id="bSheet">Создать Google Таблицу</button>
+  </div>
+</header>
+
+<div class="bar" id="bar">
+  <div class="fld"><label for="dFrom">С</label><input type="date" id="dFrom"></div>
+  <div class="fld"><label for="dTo">По</label><input type="date" id="dTo"></div>
+  <div class="fld"><label>Быстро</label><div class="presets" id="presets"></div></div>
+  <div class="sep"></div>
+  <div class="fld"><label for="p1">План 1, лиды/мес</label><input type="number" id="p1" min="0" step="1"></div>
+  <div class="fld"><label for="p2">План 2, лиды/мес</label><input type="number" id="p2" min="0" step="1"></div>
+  <div class="fld"><label for="rate">Курс ₸/$</label><input type="number" id="rate" min="1" step="1"></div>
+  <div class="status" id="status"></div>
+</div>
+<div id="exportMsg" hidden class="msg"></div>
+
+<section>
+  <div class="eyebrow" id="periodLbl">Итог периода</div>
+  <div class="kpis" id="kpis"></div>
+  <p class="note" id="kpiNote"></p>
+</section>
+
+<section>
+  <div class="eyebrow">Экономика и план</div>
+  <h2>По рекламному направлению</h2>
+  <p class="lead">Направление — по utm_medium. Расход кампании за период делится между направлениями пропорционально её лидам. План периода = месячный план × доля направления × дни периода / дни месяца.</p>
+  <div class="tscroll" id="tDir"></div>
+</section>
+
+<section>
+  <div class="eyebrow">Города</div>
+  <h2>Направление × город: экономика</h2>
+  <p class="lead">Факт-город лида из amoCRM. Адсеты таргетированы на пару городов, поэтому расход кампании делится по городам пропорционально лидам: CPL внутри кампании почти одинаковый, сравнивайте по CPQL, CAC и ROMI.</p>
+  <div class="tscroll" id="tCity"></div>
+</section>
+
+<section>
+  <div class="eyebrow">План</div>
+  <h2>План по лидам: направление × город</h2>
+  <p class="lead" id="planLead"></p>
+  <div class="tscroll" id="tPlan"></div>
+</section>
+
+<section>
+  <div class="eyebrow">Динамика</div>
+  <h2>Лиды по дням и план</h2>
+  <div class="legend"><span><i style="background:var(--accent)"></i>лиды за день</span><span><i style="background:var(--plan)"></i>План 1 в день</span><span><i style="background:var(--muted)"></i>План 2 в день</span></div>
+  <div class="chart" id="chart"></div>
+</section>
+
+<section>
+  <div class="eyebrow">Утечка</div>
+  <h2>Что рекламировали и что в итоге продали</h2>
+  <p class="lead">Продано — по полю «Курс», если пусто — по форме на сайте. Ячейка: продажи · выручка, млн ₸.</p>
+  <div class="tscroll" id="tLeak"></div>
+</section>
+
+<section>
+  <div class="eyebrow">Потери</div>
+  <h2 id="lossTitle">Куда уходят лиды</h2>
+  <div class="split">
+    <div class="panel"><h3>Этапы и причины закрытия, топ-12</h3>
+      <div class="legend" style="margin-bottom:10px"><span><i style="background:var(--warn)"></i>считается квалом</span><span><i style="background:var(--bad)"></i>мусор и недозвон</span><span><i style="background:var(--good)"></i>продажа</span><span><i style="background:var(--bar)"></i>прочее</span></div>
+      <div class="bars" id="lossBars"></div></div>
+    <div class="panel"><h3>Из чего состоят квалы</h3><div class="bars" id="qualBars"></div><p class="note" id="qualNote" style="margin-top:12px"></p></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Методика</div>
+  <p class="note">Данные: при выборе дат страница забирает из API (Apps Script → amoCRM и Facebook) лиды и расход по дням за месяц(ы), в которые попадает период, и фильтрует по датам. Привязка кампаний к направлениям — из вкладки «Маппинг» инструмента, для новых кампаний — автоматически по названию (tz → ТЗ, gp/гп → ГП, kar/shym → ТЗ_Кар_Шым, kaz → ТЗ_каз, bust → Bust_plus). Квал — этап «Оффер озвучен + дедлайн», «Наработка», «Счёт выставлен», «Отказ банка», «Ответил на рассылку», продажа, либо закрыто с причиной «Дорого», «Пропала потребность», «В следующий раз», «Гасится», «Выбрали других», «Отказ рассрочки от банка». Продажа — «Предоплата / траншевая оплата» или «Успешно реализовано», выручка из поля «Бюджет». Период фильтрует лиды по дате создания сделки. Расход FB: если в выгрузке есть разбивка по дням (колонка «День»), берутся дни периода; если выгрузка за весь месяц одной строкой, расход делится пропорционально дням периода. Файлы, загруженные вручную, заменяют данные API до перезагрузки страницы.</p>
+</section>
+</div>
+
+<script>
+/* ===== API (тот же бэкенд Apps Script, что и в инструменте) ===== */
+const API_URL = "https://script.google.com/macros/s/AKfycbyCuDj0AZcVZfZo-gUFNeIFjLeFPlJ1BM29VWT5U6RtuuQzhdih3h7TLPb6QQCREYPc/exec";
+function apiGet(params,timeoutMs){return new Promise((resolve,reject)=>{
+  const cb='__ia'+(apiGet.n=(apiGet.n||0)+1)+'_'+Date.now();const s=document.createElement('script');let done=false;
+  const to=setTimeout(()=>{if(done)return;done=true;cleanup();reject(new Error('API не ответил вовремя'));},timeoutMs||190000);
+  function cleanup(){try{delete window[cb];}catch(e){window[cb]=undefined;}if(s.parentNode)s.parentNode.removeChild(s);clearTimeout(to);}
+  window[cb]=d=>{if(done)return;done=true;cleanup();if(typeof d==='string'){try{d=JSON.parse(d);}catch(e){}}resolve(d);};
+  s.src=API_URL+'?'+Object.keys(params).map(k=>k+'='+encodeURIComponent(params[k])).join('&')+'&callback='+cb;
+  s.onerror=()=>{if(done)return;done=true;cleanup();reject(new Error('не удалось подключиться к API'));};
+  document.body.appendChild(s);});}
+
+/* ===== правила классификации (как в «Разбор направлений») ===== */
+const norm = s => (s==null?'':String(s)).toLowerCase().replace(/\s+/g,' ').trim();
+const QS=new Set(['ответилил на рассылку','ответил на рассылку','оффер озвучен + дедлайн','наработка','счет выставлен','счёт выставлен','отказ банка','предоплата / траншевая оплата','успешно реализовано']);
+const SS=new Set(['предоплата / траншевая оплата','успешно реализовано']);
+const QR=new Set(['дорого (не смог продать)','пропала потребность','в следующий раз','гасится','выбрали других','отказ рассрочки от банка']);
+const JUNK=new Set(['тотальный недозвон','дубль','нецелевой','неправильный номер','думал что бесплатно','не оставлял заявку','неадекват','нецеловой (ребенок)','тест']);
+const DIR_MAP={'september_tz':'ТЗ','august_tz':'ТЗ','tz_stazh':'ТЗ','tz_july':'ТЗ','bestseller_oldbutgold':'ТЗ',
+ 'gp_augistin':'ГП','leads_gp_07.07':'ГП','гп_бестселлер':'ГП','karshym_september':'ТЗ_Кар_Шым','plan_august_tz':'ТЗ_Кар_Шым',
+ 'tz_kaz':'ТЗ_каз','bust_plus_1307':'Bust_plus'};
+function baseStage(st){const n=norm(st);return n.startsWith('закрыто и не реализовано')?'закрыто и не реализовано':n;}
+function reasonOf(r){const n=norm(r.st);const m=n.match(/^закрыто и не реализовано\s*\((.*)\)\s*$/);return m?m[1].trim():norm(r.rs);}
+function classify(r){const b=baseStage(r.st),rs=reasonOf(r);const sale=SS.has(b);return {qual:QS.has(b)||sale||QR.has(rs),sale};}
+let MAP={};
+function autoDir(n){if(n.includes('bust')||n.includes('буст'))return 'Bust_plus';if(n.includes('kaz')||n.includes('каз'))return 'ТЗ_каз';if(n.includes('karshym')||n.includes('kar_shym')||(n.includes('kar')&&n.includes('shym')))return 'ТЗ_Кар_Шым';if(/(^|[^a-z])tz|_tz|tz_/.test(n)||n.startsWith('tz'))return 'ТЗ';if(/(^|[^a-z])gp|gp_|_gp/.test(n)||n.includes('гп'))return 'ГП';return '';}
+function dirOf(m){const n=norm(m);if(MAP[n]&&MAP[n].dir)return MAP[n].dir;return DIR_MAP[n]||autoDir(n)||(m!=null&&String(m).trim())||'(без метки)';}
+function pkgDir(p){const n=norm(p);if(!n)return '';if(n.includes('каз'))return 'ТЗ_каз';if(n.includes('career boost')||n.includes('сам себе тренер'))return 'ТЗ';if(n.includes('будь как')||n.includes('bust')||n.includes('буст'))return 'Bust_plus';return 'ГП';}
+function formDir(fn){const n=norm(fn);if(!n)return '';if(n.includes('tzkz')||(n.includes('tz')&&n.includes('kz')))return 'ТЗ_каз';if(n.includes('выпускник')||n.includes('cbplus')||n.includes('будь как'))return 'Bust_plus';if(n.includes('tz'))return 'ТЗ';if(n.includes('quiz')||n.includes('popupinvictus'))return 'ГП';return '';}
+function factDir(r){const c=pkgDir(r.crs);if(c)return c;const f=formDir(r.fn);if(f)return f;return dirOf(r.m);}
+function cityBucket(c){const n=norm(c);if(!n)return 'Без города';if(n.includes('алмат'))return 'Алматы';if(n.includes('астан'))return 'Астана';if(n.includes('караганд'))return 'Караганда';if(n.includes('шымкент')||n.includes('шимкент'))return 'Шымкент';return 'Без города';}
+function lossKey(r){const b=baseStage(r.st);if(b==='закрыто и не реализовано'){const rs=reasonOf(r);return {k:'ЗНР: '+(rs?rs.charAt(0).toUpperCase()+rs.slice(1):'без причины'),t:QR.has(rs)?'q':JUNK.has(rs)?'x':''};}if(SS.has(b))return {k:r.st.trim(),t:'s'};return {k:r.st.trim(),t:QS.has(b)?'q':''};}
+
+/* ===== форматирование ===== */
+const fI=n=>Math.round(n).toLocaleString('ru-RU');
+const fK=n=>Math.round(n).toLocaleString('ru-RU')+' ₸';
+const fU=n=>'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/,/g,' ');
+const fP=(n,d=1)=>n.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d})+'%';
+const fM=n=>(n/1e6).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
+const dash='<span class="mut">—</span>';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pill=(v,cls)=>'<span class="pill '+cls+'">'+v+'</span>';
+const ddmm=iso=>iso?iso.slice(8,10)+'.'+iso.slice(5,7)+'.'+iso.slice(0,4):'';
+function addDays(iso,n){const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+function daysBetween(a,b){return Math.round((new Date(b+'T00:00:00Z')-new Date(a+'T00:00:00Z'))/864e5)+1;}
+function daysInMonth(iso){const y=+iso.slice(0,4),m=+iso.slice(5,7);return new Date(Date.UTC(y,m,0)).getUTCDate();}
+
+/* ===== состояние ===== */
+let LEADS=[], FB=[], srcAmo='—', srcFb='—', WIN=null, LOADING=false, MANUAL=false, PAYS=null;
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+let ST={from:'',to:'',p1:store.get('ia_p1',3400),p2:store.get('ia_p2',3257),rate:store.get('ia_rate',465),preset:'all'};
+let LAST=null;
+
+const todayISO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const monthStart=iso=>iso.slice(0,8)+'01';
+const monthEnd=iso=>iso.slice(0,8)+String(daysInMonth(iso)).padStart(2,'0');
+function windowFor(from,to){const t=todayISO();let e=monthEnd(to);if(e>t)e=t;return [monthStart(from),e];}
+function setLoading(on,text){LOADING=on;const b=document.getElementById('bSync');b.disabled=on;b.textContent=on?'⏳ Загрузка…':'🔄 Свежие данные';if(on)showMsg(text||'Загружаю данные из amoCRM и Facebook… Первая загрузка месяца может занять 1–2 минуты.');}
+function applyApi(d,win){
+  if(!d||d.error)throw new Error(d&&d.error?d.error:'пустой ответ API');
+  if(!Array.isArray(d.records))throw new Error('API не вернул лиды');
+  LEADS=d.records.map(r=>{let m=String(r.m||'').trim();const has=m||String(r.cmp||'').trim()||String(r.src||'').trim()||String(r.tags||'').trim();if(!has)m='Сарафанка';
+    return {d:String(r.d||'').slice(0,10),st:String(r.st||''),rs:String(r.rs||''),b:+r.b||0,m,cmp:String(r.cmp||''),src:String(r.src||''),c:String(r.c||''),l:String(r.l||''),fn:String(r.fn||''),crs:String(r.crs||'')};}).filter(r=>r.d);
+  const k=d.fbCur==='kzt'?1/ST.rate:1;FB=[];
+  if(d.fbDaily&&typeof d.fbDaily==='object'){for(const camp in d.fbDaily){const days=d.fbDaily[camp];for(const day in days){const x=days[day]||{};FB.push({camp,day:String(day).slice(0,10),spend:(+x.spend||0)*k,impr:+x.impr||0,clicks:+x.clicks||0,from:'',to:''});}}}
+  else if(d.fbData&&typeof d.fbData==='object'){for(const camp in d.fbData){const x=d.fbData[camp]||{};FB.push({camp,day:'',spend:(+x.spend||0)*k,impr:+x.impr||0,clicks:+x.clicks||0,from:win[0],to:win[1]});}}
+  PAYS=(d.payMap&&typeof d.payMap==='object')?d.payMap:null;
+  WIN=win;MANUAL=false;
+  const upd=d.updatedAt?' · обновлено '+new Date(d.updatedAt).toLocaleString('ru-RU'):'';
+  srcAmo='API amoCRM, '+ddmm(win[0])+' – '+ddmm(win[1])+upd;srcFb='API Facebook'+(d.fbDaily?' (по дням)':' (за весь период)');
+}
+async function loadWindow(win,force){
+  setLoading(true);
+  try{
+    try{const m=await apiGet({action:'getmap'},30000);let mm=(m&&m.map!=null)?m.map:m;if(typeof mm==='string')mm=JSON.parse(mm);if(mm&&mm.map&&typeof mm.map==='object')MAP=mm.map;else if(mm&&typeof mm==='object'&&!mm.error)MAP=mm;}catch(e){}
+    const d=await apiGet({action:'data',from:win[0],to:win[1],force:force?1:0});
+    applyApi(d,win);document.getElementById('exportMsg').hidden=true;
+  }catch(err){showMsg('Не удалось загрузить данные из API: '+esc(err.message)+'. Можно загрузить выгрузки вручную кнопками «amoCRM файл» и «FB файл».','err');}
+  finally{setLoading(false);}
+}
+async function ensureData(force){
+  const win=windowFor(ST.from,ST.to);
+  if(!MANUAL&&(force||!WIN||win[0]<WIN[0]||win[1]>WIN[1]))await loadWindow(win,force);
+  renderPresets();render();
+}
+
+/* ===== расход FB за период ===== */
+let PRORATED=false;
+function fbForRange(from,to){
+  const map={};PRORATED=false;
+  for(const r of FB){
+    const k=norm(r.camp);if(!k)continue;
+    let w;
+    if(r.day){w=(r.day>=from&&r.day<=to)?1:0;}
+    else{const a=r.from||from,b=r.to||to;const s=a>from?a:from,e=b<to?b:to;w=e>=s?daysBetween(s,e)/daysBetween(a,b):0;}
+    if(!w)continue;
+    if(!r.day&&w<0.999)PRORATED=true;
+    const o=map[k]||(map[k]={name:r.camp.trim(),spend:0,impr:0,clicks:0});
+    o.spend+=r.spend*w;o.impr+=r.impr*w;o.clicks+=r.clicks*w;
+  }
+  return map;
+}
+
+/* ===== расчёт ===== */
+function blank(){return {leads:0,qual:0,sale:0,rev:0,spend:0,clicks:0};}
+function metr(o,rate){return {...o,qpct:o.leads?o.qual/o.leads*100:0,spct:o.qual?o.sale/o.qual*100:0,cpl:o.spend>0&&o.leads?o.spend/o.leads:null,cpql:o.spend>0&&o.qual?o.spend/o.qual:null,cac:o.spend>0&&o.sale?o.spend/o.sale:null,romi:o.spend>0?((o.rev/rate)-o.spend)/o.spend*100:null,conv:o.clicks?o.leads/o.clicks*100:null};}
+function planDays(from,to){let s=0;for(let d=from;d<=to;d=addDays(d,1))s+=1/daysInMonth(d);return s;} /* в «месяцах» */
+
+function compute(){
+  const {from,to,rate}=ST;
+  const all=WIN&&!MANUAL?LEADS.filter(r=>r.d>=WIN[0]&&r.d<=WIN[1]):LEADS;
+  const R=all.filter(r=>r.d&&r.d>=from&&r.d<=to);
+  const fb=fbForRange(from,to);
+  const days=daysBetween(from,to);
+  const months=planDays(from,to);
+  /* доли плана — от всех загруженных лидов */
+  const baseDir={},baseCity={};
+  for(const r of all){const d=dirOf(r.m);baseDir[d]=(baseDir[d]||0)+1;const k=d+'|'+cityBucket(r.c);baseCity[k]=(baseCity[k]||0)+1;}
+  const baseN=all.length||1;
+  /* по направлению */
+  const g={},medLeads={},medDirLeads={};
+  const cityG={};
+  for(const r of R){
+    const d=dirOf(r.m),cl=classify(r),mn=norm(r.m),cb=cityBucket(r.c),ck=d+'|'+cb;
+    const o=g[d]||(g[d]=blank());o.leads++;if(cl.qual)o.qual++;if(cl.sale){o.sale++;o.rev+=r.b;}
+    const c=cityG[ck]||(cityG[ck]=blank());c.leads++;if(cl.qual)c.qual++;if(cl.sale){c.sale++;c.rev+=r.b;}
+    medLeads[mn]=(medLeads[mn]||0)+1;
+    (medDirLeads[mn]=medDirLeads[mn]||{});medDirLeads[mn][d]=(medDirLeads[mn][d]||0)+1;
+    (medDirLeads[mn]['@'+ck]=(medDirLeads[mn]['@'+ck]||0)+1);
+  }
+  let unalloc=0;const unallocList=[];
+  for(const mn in fb){
+    const f=fb[mn],t=medLeads[mn];
+    if(!t){if(f.spend>0.005){unalloc+=f.spend;unallocList.push(f.name);}continue;}
+    for(const k in medDirLeads[mn]){
+      const share=medDirLeads[mn][k]/t;
+      if(k[0]==='@'){const ck=k.slice(1);cityG[ck].spend+=f.spend*share;cityG[ck].clicks+=f.clicks*share;}
+      else{g[k].spend+=f.spend*share;g[k].clicks+=f.clicks*share;}
+    }
+  }
+  const dirs=Object.keys(g).map(k=>({k,paid:g[k].spend>0,M:metr(g[k],rate),share:(baseDir[k]||0)/baseN}));
+  dirs.sort((a,b)=>(b.paid-a.paid)||(b.M.leads-a.M.leads));
+  for(const x of dirs){x.p1=ST.p1*x.share*months;x.p2=ST.p2*x.share*months;}
+  const sum=(arr,f)=>arr.reduce((s,x)=>s+f(x),0);
+  const tot=blank(),paid=blank();
+  for(const x of dirs){for(const f of ['leads','qual','sale','rev','spend','clicks']){tot[f]+=x.M[f];if(x.paid)paid[f]+=x.M[f];}}
+  /* города: только платные направления, без «Без города», доля ≥15% лидов направления (по всем данным) */
+  const paidDirs=dirs.filter(x=>x.paid).map(x=>x.k);
+  const cityRows=[];
+  for(const d of paidDirs){
+    const cand=Object.keys(baseCity).filter(k=>k.startsWith(d+'|')&&!k.endsWith('|Без города')&&baseCity[k]>=20&&baseCity[k]/(baseDir[d]||1)>=0.15);
+    cand.sort((a,b)=>baseCity[b]-baseCity[a]);
+    for(const ck of cand){const o=cityG[ck]||blank();const cityShare=baseCity[ck]/(baseDir[d]||1);const dx=dirs.find(x=>x.k===d);
+      cityRows.push({k:d+' · '+ck.split('|')[1],M:metr(o,rate),cityShare,p1:dx.p1*cityShare,p2:dx.p2*cityShare});}
+  }
+  /* утечка */
+  const leakRows=[...paidDirs];const otherLbl='Органика, social, сарафанка, прочее';
+  if(dirs.some(x=>x.k==='директ'))leakRows.push('директ');leakRows.push(otherLbl);
+  const leak={},factCols={};
+  for(const r of R){const cl=classify(r);if(!cl.sale)continue;let a=dirOf(r.m);if(!leakRows.includes(a))a=otherLbl;const f=factDir(r);factCols[f]=(factCols[f]||0)+1;
+    const k=a+'|'+f;const o=leak[k]||(leak[k]={n:0,rev:0});o.n++;o.rev+=r.b;}
+  const fcols=Object.keys(factCols).sort((a,b)=>factCols[b]-factCols[a]);
+  /* потери */
+  const loss={};let qClosed=0,qWork=0,qSale=0;
+  for(const r of R){const L=lossKey(r);const o=loss[L.k]||(loss[L.k]={n:0,t:L.t});o.n++;
+    const cl=classify(r);if(cl.sale)qSale++;else if(cl.qual){if(baseStage(r.st)==='закрыто и не реализовано')qClosed++;else qWork++;}}
+  /* по дням */
+  const daily={};for(const r of R)daily[r.d]=(daily[r.d]||0)+1;
+  /* расход FB по кампаниям */
+  const fbRows=Object.keys(fb).map(mn=>({name:fb[mn].name,dir:medLeads[mn]?dirOf(fb[mn].name):'нет лидов',spend:fb[mn].spend,impr:fb[mn].impr,clicks:fb[mn].clicks,leads:medLeads[mn]||0})).sort((a,b)=>b.spend-a.spend);
+  LAST={from,to,days,months,R,dirs,tot:metr(tot,rate),paid:metr(paid,rate),unalloc,unallocList,cityRows,leakRows,leak,fcols,loss,qClosed,qWork,qSale,daily,fbRows,rate,p1:ST.p1,p2:ST.p2};
+  return LAST;
+}
+
+/* ===== отрисовка ===== */
+function romiPill(v){return v==null?dash:pill(fP(v,0),v>=0?'g':'b');}
+function planPill(f,p){if(!p)return dash;const v=f/p*100;return pill(Math.round(v)+'%',v>=100?'g':v>=85?'w':'b');}
+function dev(f,p){const d=Math.round(f-p);return '<span style="color:var('+(d>=0?'--good':'--bad')+')">'+(d>0?'+':d<0?'−':'')+fI(Math.abs(d))+'</span>';}
+function render(){
+  const A=compute();
+  document.getElementById('periodLbl').textContent='Итог периода '+ddmm(A.from)+' – '+ddmm(A.to)+' · '+A.days+' дн.';
+  const T=A.tot,P=A.paid;
+  const pp1=A.dirs.reduce((s,x)=>s+x.p1,0),pp2=A.dirs.reduce((s,x)=>s+x.p2,0);
+  const tiles=[
+    ['Лиды',fI(T.leads),(T.leads/A.days).toFixed(1).replace('.',',')+' в день',''],
+    ['План 1 / План 2',fI(pp1)+' / '+fI(pp2),'факт '+(pp1?Math.round(T.leads/pp1*100):0)+'% / '+(pp2?Math.round(T.leads/pp2*100):0)+'%',''],
+    ['Квалы',fI(T.qual),fP(T.qpct)+' · CPQL (FB) '+(P.cpql?fU(P.cpql):'—'),''],
+    ['Продажи',fI(T.sale),fP(T.spct)+' от квалов','good'],
+    ['Выручка (Бюджет)',fM(T.rev)+' млн ₸',fU(T.rev/A.rate),''],
+    ['Расход FB',fU(P.spend),'CPL '+(P.cpl?fU(P.cpl):'—'),''],
+    ...(PAYS?[(()=>{let n=0,sm=0;for(const id in PAYS){const p=PAYS[id];const dt=String(p.date||'').slice(0,10);if(dt&&dt>=A.from&&dt<=A.to){n++;sm+=+p.paid||0;}}return ['Оплачено (факт)',fM(sm)+' млн ₸',n+' сделок по дате оплаты','good'];})()]:[]),
+    ['ROMI платного',P.romi==null?'—':fP(P.romi,0),'CAC '+(P.cac?fU(P.cac):'—')+' · '+fI(P.sale)+' прод.','hi'],
+  ];
+  document.getElementById('kpis').innerHTML=tiles.map(t=>'<div class="kpi'+(t[3]==='hi'?' hi':'')+'"><div class="k">'+t[0]+'</div><div class="v'+(t[3]==='good'?' good':t[3]==='hi'&&P.romi!=null?(P.romi>=0?' good':' bad'):'')+'">'+t[1]+'</div><div class="d">'+t[2]+'</div></div>').join('');
+  document.getElementById('kpiNote').innerHTML=A.R.length?('ROMI платного считает только направления с расходом FB: '+fI(P.leads)+' лидов → '+fI(P.sale)+' продаж → '+fM(P.rev)+' млн ₸ при расходе '+fU(P.spend)+'. '+(PRORATED?'<b>Расход за неполный период оценён пропорционально дням</b>, так как выгрузка FB без разбивки по дням; для точных CPL и ROMI загрузите отчёт Ads Manager с разбивкой «По дням». ':'')+(A.unalloc>0.5?'Ещё '+fU(A.unalloc)+' ушли на кампании без лидов с таким utm_medium ('+esc(A.unallocList.join(', '))+').':'')):'За выбранные даты нет лидов в загруженной выгрузке.';
+  renderDir(A);renderCity(A);renderPlan(A);renderChart(A);renderLeak(A);renderLoss(A);
+  document.getElementById('status').innerHTML='<span>Лиды: <b>'+esc(srcAmo)+'</b> · '+fI(LEADS.length)+' сделок</span><span>Расход: <b>'+esc(srcFb)+'</b></span>';
+}
+function renderDir(A){
+  if(!A.R.length){document.getElementById('tDir').innerHTML='<div class="empty">Нет лидов за период</div>';return;}
+  let h='<table><thead><tr><th class="l">Направление</th><th>Лиды</th><th>Конв. сайта</th><th>Квал</th><th>%квал</th><th>CPQL</th><th>Прод</th><th>%кв→прод</th><th>CAC</th><th>Выручка ₸</th><th>Расход</th><th>CPL</th><th>ROMI</th><th class="pl">План 1</th><th class="pl">% пл.1</th><th class="pl">План 2</th><th class="pl">% пл.2</th></tr></thead><tbody>';
+  const row=(name,M,p1,p2,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td class="l">'+esc(name)+'</td><td>'+fI(M.leads)+'</td><td>'+(M.conv==null?dash:fP(M.conv))+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+(M.cpql?fU(M.cpql):dash)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.cac?fU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+(M.spend>0?fU(M.spend):dash)+'</td><td>'+(M.cpl?fU(M.cpl):dash)+'</td><td>'+romiPill(M.romi)+'</td><td>'+fI(p1)+'</td><td>'+planPill(M.leads,p1)+'</td><td>'+fI(p2)+'</td><td>'+planPill(M.leads,p2)+'</td></tr>';
+  const paid=A.dirs.filter(x=>x.paid),free=A.dirs.filter(x=>!x.paid);
+  if(paid.length){h+='<tr class="grp"><td colspan="17">Платный трафик (Facebook)</td></tr>';for(const x of paid)h+=row(x.k,x.M,x.p1,x.p2);
+    h+=row('Итого платный',A.paid,paid.reduce((s,x)=>s+x.p1,0),paid.reduce((s,x)=>s+x.p2,0),'total');}
+  if(free.length){h+='<tr class="grp"><td colspan="17">Без расхода в FB</td></tr>';for(const x of free)h+=row(x.k,x.M,x.p1,x.p2);}
+  h+=row('Всего',A.tot,A.dirs.reduce((s,x)=>s+x.p1,0),A.dirs.reduce((s,x)=>s+x.p2,0),'total');
+  document.getElementById('tDir').innerHTML=h+'</tbody></table>';
+}
+function renderCity(A){
+  if(!A.cityRows.length){document.getElementById('tCity').innerHTML='<div class="empty">Нет данных</div>';return;}
+  let h='<table><thead><tr><th class="l">Направление · город</th><th>Лиды</th><th>Квал</th><th>%квал</th><th>Прод</th><th>%кв→прод</th><th>Расход</th><th>CPL</th><th>CPQL</th><th>CAC</th><th>Выручка ₸</th><th>ROMI</th></tr></thead><tbody>';
+  for(const x of A.cityRows){const M=x.M;h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(M.leads)+'</td><td>'+fI(M.qual)+'</td><td>'+fP(M.qpct)+'</td><td>'+fI(M.sale)+'</td><td>'+(M.qual?pill(fP(M.spct),M.spct>=10?'g':M.spct>=6?'w':'b'):dash)+'</td><td>'+(M.spend>0?fU(M.spend):dash)+'</td><td>'+(M.cpl?fU(M.cpl):dash)+'</td><td>'+(M.cpql?fU(M.cpql):dash)+'</td><td>'+(M.cac?fU(M.cac):dash)+'</td><td>'+fI(M.rev)+'</td><td>'+romiPill(M.romi)+'</td></tr>';}
+  document.getElementById('tCity').innerHTML=h+'</tbody></table>';
+}
+function renderPlan(A){
+  document.getElementById('planLead').textContent='Месячный план '+fI(A.p1)+' (План 1) и '+fI(A.p2)+' (План 2) делится по направлениям и городам пропорционально их доле лидов во всей загруженной выгрузке, затем умножается на долю месяца в периоде ('+A.days+' дн.).';
+  if(!A.cityRows.length){document.getElementById('tPlan').innerHTML='<div class="empty">Нет данных</div>';return;}
+  let h='<table><thead><tr><th class="l">Направление · город</th><th>Факт</th><th class="pl">План 1</th><th class="pl">План 1 / день</th><th class="pl">% плана 1</th><th>Откл.</th><th class="pl">План 2</th><th class="pl">План 2 / день</th><th class="pl">% плана 2</th><th>Откл.</th></tr></thead><tbody>';
+  let F=0,P1=0,P2=0;
+  for(const x of A.cityRows){F+=x.M.leads;P1+=x.p1;P2+=x.p2;
+    h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(x.M.leads)+'</td><td>'+fI(x.p1)+'</td><td>'+(x.p1/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(x.M.leads,x.p1)+'</td><td>'+dev(x.M.leads,x.p1)+'</td><td>'+fI(x.p2)+'</td><td>'+(x.p2/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(x.M.leads,x.p2)+'</td><td>'+dev(x.M.leads,x.p2)+'</td></tr>';}
+  h+='<tr class="total"><td class="l">Итого по этим городам</td><td>'+fI(F)+'</td><td>'+fI(P1)+'</td><td>'+(P1/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P1)+'</td><td>'+dev(F,P1)+'</td><td>'+fI(P2)+'</td><td>'+(P2/A.days).toFixed(1).replace('.',',')+'</td><td>'+planPill(F,P2)+'</td><td>'+dev(F,P2)+'</td></tr>';
+  document.getElementById('tPlan').innerHTML=h+'</tbody></table><p class="note" style="padding:8px 12px">Остальные лиды (другие города, директ, органика, прочие каналы) входят в общий план, но в эту таблицу не попадают.</p>';
+}
+function renderChart(A){
+  const days=[];for(let d=A.from;d<=A.to;d=addDays(d,1))days.push(d);
+  if(days.length>120){document.getElementById('chart').innerHTML='<div class="empty">Период длиннее 120 дней — график скрыт</div>';return;}
+  const pd1=days.map(d=>A.p1/daysInMonth(d)),pd2=days.map(d=>A.p2/daysInMonth(d)),v=days.map(d=>A.daily[d]||0);
+  const max=Math.max(1,...v,...pd1,...pd2);const nice=Math.ceil(max/50)*50;
+  const cw=document.getElementById('chart').clientWidth-24;const W=Math.max(520,cw||560,days.length*26),H=230,L=40,Rm=10,Tm=10,B=34,iw=W-L-Rm,ih=H-Tm-B,bw=iw/days.length;
+  const y=val=>Tm+ih-val/nice*ih;
+  let s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Лиды по дням">';
+  for(let i=0;i<=4;i++){const val=nice*i/4,yy=y(val);s+='<line x1="'+L+'" x2="'+(W-Rm)+'" y1="'+yy+'" y2="'+yy+'" stroke="var(--border2)"/><text x="'+(L-6)+'" y="'+(yy+4)+'" text-anchor="end">'+Math.round(val)+'</text>';}
+  days.forEach((d,i)=>{const x=L+i*bw+bw*0.15,h=ih-(y(v[i])-Tm);s+='<rect x="'+x.toFixed(1)+'" y="'+y(v[i]).toFixed(1)+'" width="'+(bw*0.7).toFixed(1)+'" height="'+Math.max(0,h).toFixed(1)+'" rx="2" fill="var(--accent)"><title>'+ddmm(d)+': '+v[i]+' лидов</title></rect>';
+    if(days.length<=40||i%Math.ceil(days.length/30)===0)s+='<text x="'+(L+i*bw+bw/2).toFixed(1)+'" y="'+(H-B+16)+'" text-anchor="middle">'+d.slice(8,10)+'</text>';});
+  const line=(arr,col,dashA)=>{let p='';arr.forEach((val,i)=>{p+=(i?'L':'M')+(L+i*bw+bw/2).toFixed(1)+' '+y(val).toFixed(1);});return '<path d="'+p+'" fill="none" stroke="'+col+'" stroke-width="2"'+(dashA?' stroke-dasharray="5 4"':'')+'/>';};
+  s+=line(pd1,'var(--plan)')+line(pd2,'var(--muted)',true)+'</svg>';
+  document.getElementById('chart').innerHTML=s;
+}
+function renderLeak(A){
+  if(!A.fcols.length){document.getElementById('tLeak').innerHTML='<div class="empty">Нет продаж за период</div>';return;}
+  let h='<table><thead><tr><th class="l">Реклама \\ продано</th>'+A.fcols.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>Всего</th></tr></thead><tbody>';
+  const colT={};let all=0,allR=0;
+  for(const a of A.leakRows){let n=0,rv=0;let cells='';
+    for(const f of A.fcols){const o=A.leak[a+'|'+f];if(o){n+=o.n;rv+=o.rev;colT[f]=colT[f]||{n:0,rev:0};colT[f].n+=o.n;colT[f].rev+=o.rev;}
+      cells+='<td'+(a===f?' class="diag"':'')+'>'+(o?o.n+' · '+fM(o.rev):'<span class="mut">·</span>')+'</td>';}
+    if(!n)continue;all+=n;allR+=rv;h+='<tr><td class="l">'+esc(a)+'</td>'+cells+'<td>'+n+' · '+fM(rv)+'</td></tr>';}
+  h+='<tr class="total"><td class="l">Всего продано</td>'+A.fcols.map(f=>'<td>'+(colT[f]?colT[f].n+' · '+fM(colT[f].rev):'·')+'</td>').join('')+'<td>'+all+' · '+fM(allR)+'</td></tr>';
+  document.getElementById('tLeak').innerHTML=h+'</tbody></table>';
+}
+function renderLoss(A){
+  document.getElementById('lossTitle').textContent='Куда уходят '+fI(A.R.length)+' лидов';
+  const arr=Object.keys(A.loss).map(k=>({k,...A.loss[k]})).sort((a,b)=>b.n-a.n).slice(0,12);
+  const mx=arr.length?arr[0].n:1;
+  document.getElementById('lossBars').innerHTML=arr.length?arr.map(x=>'<div class="brow"><span class="lbl" title="'+esc(x.k)+'">'+esc(x.k)+'</span><div class="track"><div class="fill '+x.t+'" style="width:'+(x.n/mx*100).toFixed(1)+'%"></div></div><span class="n">'+fI(x.n)+'</span></div>').join(''):'<div class="empty">Нет данных</div>';
+  const q=[['Закрыты с «квальной» причиной',A.qClosed,'q'],['Продажа',A.qSale,'s'],['Ещё в работе',A.qWork,'a']];const qm=Math.max(1,...q.map(x=>x[1]));
+  document.getElementById('qualBars').innerHTML=q.map(x=>'<div class="brow"><span class="lbl">'+x[0]+'</span><div class="track"><div class="fill '+x[2]+'" style="width:'+(x[1]/qm*100).toFixed(1)+'%"></div></div><span class="n">'+fI(x[1])+'</span></div>').join('');
+  const qt=A.qClosed+A.qSale+A.qWork;
+  document.getElementById('qualNote').textContent=qt?Math.round(A.qClosed/qt*100)+'% квалов уже закрыты без оплаты. Из «квальных» отказов «В следующий раз» и «Гасится» — база для дожима под следующий поток.':'';
+}
+
+/* ===== период ===== */
+function dataRange(){let a='9999',b='0000';for(const r of LEADS){if(!r.d)continue;if(r.d<a)a=r.d;if(r.d>b)b=r.d;}return a==='9999'?[new Date().toISOString().slice(0,10),new Date().toISOString().slice(0,10)]:[a,b];}
+function presetList(){
+  if(!MANUAL){const t=todayISO(),ms=monthStart(t);const pm=monthStart(addDays(ms,-1)),pe=addDays(ms,-1);
+    const out=[['cur','Этот месяц',ms,t],['prev','Прошлый месяц',pm,pe],['last7','Последние 7 дн.',addDays(t,-6),t],['last14','Последние 14 дн.',addDays(t,-13),t]];
+    let s=ms,i=1;while(s<=t&&i<=5){const e=addDays(s,6)>t?t:addDays(s,6);out.push(['w'+i,ddmm(s).slice(0,5)+'–'+ddmm(e).slice(0,5),s,e]);s=addDays(e,1);i++;}
+    return out;}
+  const [a,b]=dataRange();const out=[['all','Весь период',a,b]];
+  out.push(['last7','Последние 7 дн.',addDays(b,-6)<a?a:addDays(b,-6),b]);
+  out.push(['last14','Последние 14 дн.',addDays(b,-13)<a?a:addDays(b,-13),b]);
+  let s=a,i=1;while(s<=b&&i<=6){const e=addDays(s,6)>b?b:addDays(s,6);out.push(['w'+i,ddmm(s).slice(0,5)+'–'+ddmm(e).slice(0,5),s,e]);s=addDays(e,1);i++;}
+  return out;
+}
+function renderPresets(){
+  document.getElementById('presets').innerHTML=presetList().map(p=>'<button class="chip'+(ST.preset===p[0]?' on':'')+'" data-p="'+p[0]+'" data-a="'+p[2]+'" data-b="'+p[3]+'">'+p[1]+'</button>').join('');
+}
+document.getElementById('presets').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b||LOADING)return;ST.from=b.dataset.a;ST.to=b.dataset.b;ST.preset=b.dataset.p;syncInputs();renderPresets();ensureData(false);});
+function syncInputs(){const t=todayISO();for(const id of ['dFrom','dTo']){const el=document.getElementById(id);el.max=t;}document.getElementById('dFrom').value=ST.from;document.getElementById('dTo').value=ST.to;document.getElementById('p1').value=ST.p1;document.getElementById('p2').value=ST.p2;document.getElementById('rate').value=ST.rate;}
+function onDate(){let f=document.getElementById('dFrom').value,t=document.getElementById('dTo').value;if(!f||!t)return;if(f>t){const x=f;f=t;t=x;}ST.from=f;ST.to=t;ST.preset='';renderPresets();syncInputs();ensureData(false);}
+document.getElementById('dFrom').addEventListener('change',onDate);document.getElementById('dTo').addEventListener('change',onDate);
+for(const [id,key] of [['p1','p1'],['p2','p2'],['rate','rate']])document.getElementById(id).addEventListener('input',e=>{const v=parseFloat(e.target.value);if(!(v>0))return;ST[key]=v;store.set('ia_'+key,v);render();});
+
+/* ===== загрузка файлов ===== */
+function parseCSV(t){t=t.replace(/^﻿/,'');const first=t.split('\n',1)[0];const delim=(first.split(';').length>first.split(',').length)?';':',';
+  const rows=[];let row=[],c='',q=false;for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch==='"'){if(t[i+1]==='"'){c+='"';i++;}else q=false;}else c+=ch;}else{if(ch==='"')q=true;else if(ch===delim){row.push(c);c='';}else if(ch==='\n'){row.push(c);rows.push(row);row=[];c='';}else if(ch!=='\r')c+=ch;}}
+  if(c!==''||row.length){row.push(c);rows.push(row);}return rows.filter(r=>r.some(x=>x!==''));}
+function toObjects(arr){if(!arr.length)return [];const H=arr[0].map(h=>String(h==null?'':h).trim());const out=[];for(let i=1;i<arr.length;i++){const o={};H.forEach((k,j)=>{if(k&&!(k in o))o[k]=arr[i][j]==null?'':arr[i][j];});out.push(o);}return out;}
+function readFile(f){return new Promise((res,rej)=>{const n=f.name.toLowerCase();const rd=new FileReader();
+  if(n.endsWith('.xlsx')||n.endsWith('.xls')){if(typeof XLSX==='undefined'){rej(new Error('Библиотека XLSX не загрузилась. Сохраните выгрузку как CSV.'));return;}
+    rd.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]];res(toObjects(XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd'})));}catch(err){rej(err);}};rd.readAsArrayBuffer(f);}
+  else{rd.onload=()=>{try{res(toObjects(parseCSV(rd.result)));}catch(err){rej(err);}};rd.readAsText(f);}});}
+function pick(H,tests){for(const t of tests)for(const h of H)if(norm(h)===t)return h;for(const t of tests)for(const h of H)if(norm(h).includes(t))return h;return null;}
+function toISO(s){s=String(s||'').trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[0];m=s.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})/);if(m){const y=m[3].length===2?'20'+m[3]:m[3];return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');}return '';}
+function parseNum(v){if(typeof v==='number')return v;let s=String(v==null?'':v).replace(/\s/g,'').trim();if(!s||s==='-')return 0;if(s.includes('.')&&s.includes(','))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');else if(s.includes(','))s=s.replace(',','.');s=s.replace(/[^0-9.\-]/g,'');return parseFloat(s)||0;}
+function amoRecords(rows){
+  if(!rows.length)return [];const H=Object.keys(rows[0]);
+  const cStage=pick(H,['этап сделки','этап']),cReason=pick(H,['причина отказа','причина']),cBud=pick(H,['бюджет']),cMed=pick(H,['utm_medium']),cCmp=pick(H,['utm_campaign']),cSrc=pick(H,['utm_source']),cForm=pick(H,['formname']),cCrs=pick(H,['курс']),cDate=pick(H,['дата создания','дата']),cTags=pick(H,['теги','тэги','tags']);
+  if(!cStage||!cMed||!cDate)throw new Error('Не нашёл колонки «Этап сделки», «utm_medium» и «Дата создания сделки». Это выгрузка сделок amoCRM?');
+  const cityCols=H.filter(h=>{const n=norm(h);return n.includes('город')||n.includes('қала')||n.includes('қаладан');});
+  const langCols=H.filter(h=>{const n=norm(h);return n.includes('язык')||n.includes('тілі')||n.includes('на_каком')||n.includes('комфортнее');});
+  return rows.map(r=>{const first=cols=>{for(const c of cols){const v=String(r[c]||'').trim();if(v)return v;}return '';};
+    let m=String(r[cMed]||'').trim();const cmp=String(cCmp?r[cCmp]||'':'').trim(),src=String(cSrc?r[cSrc]||'':'').trim(),tags=String(cTags?r[cTags]||'':'').trim();
+    if(!m&&!cmp&&!src&&!tags)m='Сарафанка';
+    return {d:toISO(r[cDate]),st:String(r[cStage]||''),rs:String(cReason?r[cReason]||'':''),b:parseFloat(String(cBud?r[cBud]||'0':'0').replace(/[^\d.]/g,''))||0,m,cmp,src,c:first(cityCols),l:first(langCols),fn:String(cForm?r[cForm]||'':''),crs:String(cCrs?r[cCrs]||'':'')};}).filter(r=>r.d);
+}
+function fbRecords(rows){
+  if(!rows.length)return [];const H=Object.keys(rows[0]);
+  const cC=pick(H,['название кампании','campaign name']),cS=pick(H,['потраченная сумма','amount spent','spend']);
+  if(!cC||!cS)throw new Error('Не нашёл колонки «Название кампании» и «Потраченная сумма». Это выгрузка Ads Manager?');
+  const cI=pick(H,['показы','impressions']),cK=pick(H,['клики по ссылке','link clicks']),cD=pick(H,['день','day']),cF=pick(H,['дата начала отчетности','reporting starts']),cT=pick(H,['окончание отчетности','reporting ends']);
+  const kzt=/kzt|тенге|₸/.test(norm(cS));
+  return rows.filter(r=>String(r[cC]||'').trim()).map(r=>({camp:String(r[cC]).trim(),spend:parseNum(r[cS])/(kzt?ST.rate:1),impr:cI?parseNum(r[cI]):0,clicks:cK?parseNum(r[cK]):0,day:cD?toISO(r[cD]):'',from:cF?toISO(r[cF]):'',to:cT?toISO(r[cT]):''}));
+}
+function showMsg(html,cls){const el=document.getElementById('exportMsg');el.className='msg'+(cls?' '+cls:'');el.innerHTML=html;el.hidden=false;}
+document.getElementById('fAmo').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const recs=amoRecords(await readFile(f));if(!recs.length)throw new Error('В файле нет строк с датой создания.');LEADS=recs;srcAmo=f.name;MANUAL=true;const [a,b]=dataRange();ST.from=a;ST.to=b;ST.preset='all';syncInputs();renderPresets();render();showMsg('Загружено '+fI(recs.length)+' сделок из «'+esc(f.name)+'», период '+ddmm(a)+' – '+ddmm(b)+'.','ok');}catch(err){showMsg('Не удалось прочитать выгрузку amoCRM: '+esc(err.message),'err');}e.target.value='';});
+document.getElementById('fFb').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const recs=fbRecords(await readFile(f));if(!recs.length)throw new Error('В файле нет строк с кампаниями.');FB=recs;MANUAL=true;const daily=recs.some(r=>r.day);srcFb=f.name+(daily?' (по дням)':'');render();showMsg('Расход FB загружен: '+recs.length+' строк'+(daily?', с разбивкой по дням — расход за период считается точно.':'. Разбивки по дням нет, поэтому расход за часть периода делится пропорционально дням. Для точного расхода выгрузите отчёт с разбивкой «По дням».'),'ok');}catch(err){showMsg('Не удалось прочитать выгрузку FB: '+esc(err.message),'err');}e.target.value='';});
+
+/* ===== выгрузка в таблицу ===== */
+const r2=v=>v==null?'':Math.round(v*100)/100, r1=v=>v==null?'':Math.round(v*10)/10;
+let SHEETS=[];
+function buildWorkbook(){
+  const A=LAST;const wb=XLSX.utils.book_new();const per=ddmm(A.from)+' – '+ddmm(A.to);
+  SHEETS=[];const add=(name,aoa,widths)=>{SHEETS.push({name,rows:aoa.map(r=>r.map(v=>v==null?'':v))});const ws=XLSX.utils.aoa_to_sheet(aoa);if(widths)ws['!cols']=widths.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,name);};
+  const T=A.tot,P=A.paid;
+  add('Сводка',[['Invictus · аналитика лидов'],['Период',per],['Дней',A.days],['Курс ₸/$',A.rate],['План 1, лиды/мес',A.p1],['План 2, лиды/мес',A.p2],[],
+    ['Показатель','Всего','Платный трафик'],['Лиды',T.leads,P.leads],['Квалы',T.qual,P.qual],['% квал',r1(T.qpct),r1(P.qpct)],['Продажи',T.sale,P.sale],['% квал→продажа',r1(T.spct),r1(P.spct)],
+    ['Выручка ₸',Math.round(T.rev),Math.round(P.rev)],['Расход $',r2(P.spend),r2(P.spend)],['CPL $',r2(T.spend?T.spend/T.leads:null),r2(P.cpl)],['CPQL $',r2(T.spend?T.spend/T.qual:null),r2(P.cpql)],['CAC $',r2(T.spend&&T.sale?T.spend/T.sale:null),r2(P.cac)],['ROMI %',r1(T.romi),r1(P.romi)],
+    ['План 1, лиды за период',Math.round(A.dirs.reduce((s,x)=>s+x.p1,0))],['План 2, лиды за период',Math.round(A.dirs.reduce((s,x)=>s+x.p2,0))],[],
+    ['Источники: лиды — '+srcAmo+'; расход — '+srcFb+'. ROMI «Всего» включает выручку неплатных каналов, окупаемость рекламы — колонка «Платный трафик».']],[34,16,16]);
+  const dh=['Направление','Тип','Лиды','Конв. сайта %','Квал','%квал','CPQL $','Продажи','%кв→прод','CAC $','Выручка ₸','Расход $','CPL $','ROMI %','План 1','% плана 1','Откл. 1','План 2','% плана 2','Откл. 2'];
+  const drow=(name,type,M,p1,p2)=>[name,type,M.leads,r1(M.conv),M.qual,r1(M.qpct),r2(M.cpql),M.sale,r1(M.spct),r2(M.cac),Math.round(M.rev),r2(M.spend),r2(M.cpl),r1(M.romi),Math.round(p1),p1?Math.round(M.leads/p1*100):'',Math.round(M.leads-p1),Math.round(p2),p2?Math.round(M.leads/p2*100):'',Math.round(M.leads-p2)];
+  const d=[['По рекламному направлению · '+per],dh];for(const x of A.dirs)d.push(drow(x.k,x.paid?'Платный':'Без расхода',x.M,x.p1,x.p2));
+  const pd=A.dirs.filter(x=>x.paid);d.push(drow('Итого платный','',A.paid,pd.reduce((s,x)=>s+x.p1,0),pd.reduce((s,x)=>s+x.p2,0)));
+  d.push(drow('Всего','',A.tot,A.dirs.reduce((s,x)=>s+x.p1,0),A.dirs.reduce((s,x)=>s+x.p2,0)));
+  add('Направления',d,[24,12].concat(Array(18).fill(11)));
+  const c=[['Направление × город · '+per],['Направление · город','Лиды','Квал','%квал','Продажи','%кв→прод','Расход $','CPL $','CPQL $','CAC $','Выручка ₸','ROMI %']];
+  for(const x of A.cityRows){const M=x.M;c.push([x.k,M.leads,M.qual,r1(M.qpct),M.sale,r1(M.spct),r2(M.spend),r2(M.cpl),r2(M.cpql),r2(M.cac),Math.round(M.rev),r1(M.romi)]);}
+  c.push([],['Расход кампании делится между городами пропорционально лидам.']);add('Города',c,[30].concat(Array(11).fill(11)));
+  const p=[['План по лидам: направление × город · '+per],['Направление · город','Факт','Доля города в направлении %','План 1','План 1 / день','% плана 1','Откл. 1','План 2','План 2 / день','% плана 2','Откл. 2']];
+  let F=0,P1=0,P2=0;for(const x of A.cityRows){F+=x.M.leads;P1+=x.p1;P2+=x.p2;p.push([x.k,x.M.leads,r1(x.cityShare*100),Math.round(x.p1),r1(x.p1/A.days),x.p1?Math.round(x.M.leads/x.p1*100):'',Math.round(x.M.leads-x.p1),Math.round(x.p2),r1(x.p2/A.days),x.p2?Math.round(x.M.leads/x.p2*100):'',Math.round(x.M.leads-x.p2)]);}
+  p.push(['Итого по этим городам',F,'',Math.round(P1),r1(P1/A.days),P1?Math.round(F/P1*100):'',Math.round(F-P1),Math.round(P2),r1(P2/A.days),P2?Math.round(F/P2*100):'',Math.round(F-P2)]);
+  add('План по городам',p,[30].concat(Array(10).fill(12)));
+  const l=[['Что рекламировали → что продали · '+per],['Реклама \\ продано'].concat(A.fcols.map(f=>f+', прод')).concat(['Всего прод']).concat(A.fcols.map(f=>f+', ₸')).concat(['Всего ₸'])];
+  for(const a of A.leakRows){const ns=A.fcols.map(f=>(A.leak[a+'|'+f]||{}).n||0),rs=A.fcols.map(f=>(A.leak[a+'|'+f]||{}).rev||0);const n=ns.reduce((s,x)=>s+x,0);if(!n)continue;l.push([a].concat(ns,[n],rs,[rs.reduce((s,x)=>s+x,0)]));}
+  add('Утечка',l,[34].concat(Array(A.fcols.length*2+2).fill(12)));
+  const lo=[['Этапы и причины закрытия · '+per],['Этап / причина','Лидов','Доля %','Тип']];const tl={q:'квал',x:'мусор / недозвон',s:'продажа','':''};
+  Object.keys(A.loss).map(k=>({k,...A.loss[k]})).sort((a,b)=>b.n-a.n).forEach(x=>lo.push([x.k,x.n,r1(x.n/A.R.length*100),tl[x.t]]));add('Потери',lo,[44,10,10,18]);
+  const dd=[['Лиды по дням · '+per],['Дата','Лиды','План 1 / день','План 2 / день']];for(let x=A.from;x<=A.to;x=addDays(x,1))dd.push([ddmm(x),A.daily[x]||0,r1(A.p1/daysInMonth(x)),r1(A.p2/daysInMonth(x))]);add('По дням',dd,[12,10,14,14]);
+  const f=[['Расход FB за период · '+per],['Кампания (= utm_medium)','Направление','Расход $','Показы','Клики','CTR %','CPC $','Лиды amo']];
+  let s=0;for(const x of A.fbRows){s+=x.spend;f.push([x.name,x.dir,r2(x.spend),Math.round(x.impr),Math.round(x.clicks),x.impr?r2(x.clicks/x.impr*100):'',x.clicks?r2(x.spend/x.clicks):'',x.leads]);}
+  f.push(['ИТОГО','',r2(s)]);add('Расход FB',f,[28,14,12,12,10,9,9,10]);
+  return wb;
+}
+function wbBase64(){return XLSX.write(buildWorkbook(),{bookType:'xlsx',type:'base64'});}
+function wbBlob(){const a=XLSX.write(buildWorkbook(),{bookType:'xlsx',type:'array'});return new Blob([a],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+const fileTitle=()=>'Invictus · аналитика '+ddmm(LAST.from)+'–'+ddmm(LAST.to);
+
+function sheetsPayload(){buildWorkbook();return SHEETS;}
+document.getElementById('bSheet').addEventListener('click',async ()=>{
+  const btn=document.getElementById('bSheet');
+  if(typeof XLSX==='undefined'){showMsg('Библиотека для таблиц не загрузилась. Перезагрузите страницу.','err');return;}
+  if(!LAST||!LAST.R.length){showMsg('За выбранный период нет лидов — таблицу создавать не из чего.','err');return;}
+  btn.disabled=true;btn.textContent='Создаю…';
+  const token='ia'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  try{
+    await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'export',token,title:fileTitle(),sheets:sheetsPayload()})});
+    let url='';
+    for(let i=0;i<12&&!url;i++){await new Promise(r=>setTimeout(r,2500));try{const r=await apiGet({action:'exportstatus',token},20000);if(r&&r.url)url=r.url;else if(r&&r.error&&i>=3)throw new Error(r.error);}catch(e){if(i>=3)throw e;}}
+    if(!url)throw new Error('нет ответа');
+    showMsg('Google Таблица создана: <a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(fileTitle())+'</a>','ok');
+  }catch(err){showMsg('Не получилось создать Google Таблицу ('+esc(err.message)+'). Скорее всего, в Apps Script ещё не добавлена функция экспорта — см. файл gas_export.gs в репозитории. Пока можно нажать «Скачать XLSX» и открыть файл в Google Таблицах.','err');}
+  finally{btn.disabled=false;btn.textContent='Создать Google Таблицу';}
+});
+document.getElementById('bXlsx').addEventListener('click',()=>{
+  if(typeof XLSX==='undefined'){showMsg('Библиотека для таблиц не загрузилась. Перезагрузите страницу.','err');return;}
+  XLSX.writeFile(buildWorkbook(),'invictus_analytics_'+LAST.from+'_'+LAST.to+'.xlsx');
+});
+document.getElementById('bSync').addEventListener('click',()=>{if(!LOADING){MANUAL=false;ensureData(true);}});
+
+/* ===== старт ===== */
+let rT=null;window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(()=>{if(LAST)renderChart(LAST);},200);});
+ST.to=todayISO();ST.from=monthStart(ST.to);ST.preset='cur';
+syncInputs();renderPresets();render();ensureData(false);
+</script>
+</body>
+</html>
