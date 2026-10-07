@@ -87,6 +87,22 @@ tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-tr
 .pill{display:inline-block;padding:1px 8px;border-radius:20px;font-weight:600;font-size:12.5px}
 .pill.g{background:var(--good-soft);color:var(--good)} .pill.w{background:var(--warn-soft);color:var(--warn)} .pill.b{background:var(--bad-soft);color:var(--bad)}
 .diag{font-weight:700}
+.ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end}
+.ctl select,.sitebox select,.sitebox input{padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--ink);font:500 13px var(--f-body);max-width:320px}
+tr.lv0 td:first-child{font-weight:600}
+tr.lv1 td:first-child{padding-left:26px}
+tr.lv2 td:first-child{padding-left:44px;color:var(--muted)}
+tr.lv2.adrow td:first-child{color:var(--ink)}
+.tg{cursor:pointer;user-select:none}
+.tg .ar{display:inline-block;width:14px;color:var(--muted)}
+.nm{display:inline-block;max-width:340px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.path{display:block;font-size:11.5px;color:var(--muted);max-width:340px;overflow:hidden;text-overflow:ellipsis}
+.thumb{width:30px;height:30px;border-radius:5px;object-fit:cover;vertical-align:middle;border:1px solid var(--border)}
+td a{color:var(--accent);text-decoration:none} td a:hover{text-decoration:underline}
+.tagx{display:inline-flex;align-items:center;gap:4px;padding:1px 6px 1px 8px;margin:1px 3px 1px 0;border-radius:12px;background:var(--accent-soft);color:var(--accent);font-size:12px}
+.tagx button{border:0;background:none;color:inherit;cursor:pointer;font-size:13px;padding:0 2px}
+.sitebox td{vertical-align:top}
+.sitebox td.asg{white-space:normal;min-width:260px;text-align:left}
 .split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:760px){.split{grid-template-columns:1fr}}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;min-width:0}
@@ -196,6 +212,25 @@ tr.grp td{background:var(--surface2);color:var(--muted);font-size:11.5px;text-tr
   <div class="tscroll" id="tLeakOld"></div>
 </section>
 
+<section id="secCre">
+  <div class="eyebrow">Сквозная аналитика</div>
+  <h2>Креативы: кампания → группа → объявление</h2>
+  <p class="lead">Расход, показы и клики — из Facebook по каждому объявлению. Лиды привязаны к объявлению по метке utm_content (ID или название объявления) внутри кампании utm_medium. Продажи — из amoCRM, оплаты — из таблицы оплат по ID сделки.</p>
+  <div class="ctl">
+    <div class="fld"><label>Направление</label><div class="presets" id="creDir"></div></div>
+    <div class="fld"><label>Вид</label><div class="presets" id="creView"><button class="chip" data-v="tree">Дерево</button><button class="chip" data-v="ads">Все объявления</button></div></div>
+    <div class="fld"><label>Сортировка</label><select id="creSort"><option value="spend">Расход</option><option value="leads">Лиды</option><option value="qual">Квалы</option><option value="sale">Продажи</option><option value="rev">Выручка</option><option value="romi">ROMI</option><option value="cpl">CPL (дешевле выше)</option><option value="cpql">CPQL (дешевле выше)</option><option value="conv">Конверсия клик → лид</option></select></div>
+    <div class="fld"><label>Показать</label><div class="presets" id="creTop"><button class="chip" data-t="0">Все</button><button class="chip" data-t="5">ТОП-5</button><button class="chip" data-t="10">ТОП-10</button></div></div>
+  </div>
+  <div class="tscroll" id="tCre"></div>
+  <p class="note" id="creNote"></p>
+
+  <h3 style="font:600 16px var(--f-body);margin:14px 0 0">Конверсия сайтов</h3>
+  <p class="lead">Сайт определяется по полю referer у лида. Каждому сайту назначьте кампании, группы или объявления, которые на него ведут; конверсия = лиды назначенных объявлений / клики по ссылке. Пока ничего не назначено, сайт получает объявления, у которых большинство лидов пришло с этого сайта (авто). Привязка сохраняется в скрипте и видна всем.</p>
+  <div class="tscroll sitebox" id="tSite"></div>
+  <div class="ctl sitebox" style="margin-top:8px"><input id="siteNew" placeholder="добавить сайт, например invictus.kz/quiz"><button class="btn" id="siteAdd">＋ Сайт</button><span class="note" id="siteMsg"></span></div>
+</section>
+
 <section>
   <div class="eyebrow">Потери</div>
   <h2 id="lossTitle">Куда уходят лиды</h2>
@@ -273,8 +308,9 @@ function daysBetween(a,b){return Math.round((new Date(b+'T00:00:00Z')-new Date(a
 function daysInMonth(iso){const y=+iso.slice(0,4),m=+iso.slice(5,7);return new Date(Date.UTC(y,m,0)).getUTCDate();}
 
 /* ===== состояние ===== */
-let PAYS_CUT=0, CAL=null, LEADS=[], FB=[], srcAmo='—', srcFb='—', WIN=null, LOADING=false, MANUAL=false, PAYS=null;
+let FBADS=null,FBADS_ERR='',SITES={},PAYS_CUT=0, CAL=null, LEADS=[], FB=[], srcAmo='—', srcFb='—', WIN=null, LOADING=false, MANUAL=false, PAYS=null;
 const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+SITES=store.get('ia_sites',{});
 let ST={unk:store.get('ia_unk','ТЗ'),from:'',to:'',p1:store.get('ia_p1',3400),p2:store.get('ia_p2',3257),rate:store.get('ia_rate',465),preset:'all'};
 let LAST=null;
 
@@ -287,10 +323,13 @@ function applyApi(d,win){
   if(!d||d.error)throw new Error(d&&d.error?d.error:'пустой ответ API');
   if(!Array.isArray(d.records))throw new Error('API не вернул лиды');
   LEADS=d.records.map(r=>{let m=String(r.m||'').trim();const has=m||String(r.cmp||'').trim()||String(r.src||'').trim()||String(r.tags||'').trim();if(!has)m='Сарафанка';
-    return {id:String(r.id==null?'':r.id).replace(/\.0$/,''),d:String(r.d||'').slice(0,10),st:String(r.st||''),rs:String(r.rs||''),b:+r.b||0,m,cmp:String(r.cmp||''),src:String(r.src||''),c:String(r.c||''),l:String(r.l||''),fn:String(r.fn||''),crs:String(r.crs||''),tags:String(r.tags||''),nm:String(r.nm||''),ref:String(r.ref||''),gym:String(r.gym||'')};}).filter(r=>r.d);
+    return {id:String(r.id==null?'':r.id).replace(/\.0$/,''),d:String(r.d||'').slice(0,10),st:String(r.st||''),rs:String(r.rs||''),b:+r.b||0,m,cmp:String(r.cmp||''),src:String(r.src||''),c:String(r.c||''),l:String(r.l||''),fn:String(r.fn||''),crs:String(r.crs||''),tags:String(r.tags||''),nm:String(r.nm||''),ref:String(r.ref||''),gym:String(r.gym||''),ad:String(r.ad||''),trm:String(r.trm||'')};}).filter(r=>r.d);
   const k=d.fbCur==='kzt'?1/ST.rate:1;FB=[];
   if(d.fbDaily&&typeof d.fbDaily==='object'){for(const camp in d.fbDaily){const days=d.fbDaily[camp];for(const day in days){const x=days[day]||{};FB.push({camp,day:String(day).slice(0,10),spend:(+x.spend||0)*k,impr:+x.impr||0,clicks:+x.clicks||0,from:'',to:''});}}}
   else if(d.fbData&&typeof d.fbData==='object'){for(const camp in d.fbData){const x=d.fbData[camp]||{};FB.push({camp,day:'',spend:(+x.spend||0)*k,impr:+x.impr||0,clicks:+x.clicks||0,from:win[0],to:win[1]});}}
+  FBADS=null;FBADS_ERR='';
+  if(d.fbAds&&d.fbAds.error)FBADS_ERR=String(d.fbAds.error);
+  else if(d.fbAds&&d.fbAds.meta){FBADS={meta:d.fbAds.meta,daily:{}};for(const id in d.fbAds.daily||{}){const o=FBADS.daily[id]={};const dd=d.fbAds.daily[id];for(const day in dd){const v=dd[day];o[String(day).slice(0,10)]=[(+v[0]||0)*k,+v[1]||0,+v[2]||0];}}}
   PAYS=null;
   if(d.payMap&&typeof d.payMap==='object'){PAYS={};let cut=0;
     for(const k in d.payMap){const p=d.payMap[k];const who=norm([p.mgr,p.manager,p.who,p.curator].filter(Boolean).join(' '));
@@ -304,6 +343,7 @@ async function loadWindow(win,force){
   setLoading(true);
   try{
     try{const m=await apiGet({action:'getmap'},30000);let mm=(m&&m.map!=null)?m.map:m;if(typeof mm==='string')mm=JSON.parse(mm);if(mm&&mm.map&&typeof mm.map==='object')MAP=mm.map;else if(mm&&typeof mm==='object'&&!mm.error)MAP=mm;}catch(e){}
+    try{const z=await apiGet({action:'getsites'},30000);let v=z&&z.sites;if(typeof v==='string'&&v)v=JSON.parse(v);if(v&&typeof v==='object'&&!Array.isArray(v)){SITES=v;store.set('ia_sites',SITES);}}catch(e){}
     const d=await apiGet({action:'data',from:win[0],to:win[1],force:force?1:0});
     applyApi(d,win);
     try{const c=await apiGet({action:'calendar',from:win[0],to:win[1]},60000);CAL=(c&&c.days&&!c.error&&Object.keys(c.days).length)?c:null;}catch(e){CAL=null;}document.getElementById('exportMsg').hidden=true;
@@ -519,7 +559,7 @@ function render(){
   ];
   document.getElementById('kpis').innerHTML=tiles.map(t=>'<div class="kpi'+(t[3]==='hi'?' hi':'')+'"><div class="k">'+t[0]+'</div><div class="v'+(t[3]==='good'?' good':t[3]==='hi'&&P.romi!=null?(P.romi>=0?' good':' bad'):'')+'">'+t[1]+'</div><div class="d">'+t[2]+'</div></div>').join('');
   document.getElementById('kpiNote').innerHTML=A.R.length?('ROMI платного считает только направления с расходом FB: '+fI(P.leads)+' лидов → '+fI(P.sale)+' продаж → '+fM(P.rev)+' млн ₸ при расходе '+fKU(P.spend)+'. '+(PRORATED?'<b>Расход за неполный период оценён пропорционально дням</b>, так как выгрузка FB без разбивки по дням; для точных CPL и ROMI загрузите отчёт Ads Manager с разбивкой «По дням». ':'')+(A.unalloc>0.5?'Ещё '+fKUi(A.unalloc)+' ушли на кампании без лидов с таким utm_medium ('+esc(A.unallocList.join(', '))+').':'')):'За выбранные даты нет лидов в загруженной выгрузке.';
-  renderDir(A);renderCity(A);renderPlan(A);renderChart(A);renderLeak(A);renderLoss(A);
+  renderDir(A);renderCity(A);renderPlan(A);renderChart(A);renderLeak(A);renderCre(A);renderLoss(A);
   document.getElementById('status').innerHTML='<span>Лиды: <b>'+esc(srcAmo)+'</b> · '+fI(LEADS.length)+' сделок</span><span>Расход: <b>'+esc(srcFb)+'</b></span>';
 }
 function renderDir(A){
@@ -708,6 +748,139 @@ function renderLeak(A){
   el.innerHTML=h+'</tbody></table>';
 }
 document.getElementById('leakMet').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;LEAKM=b.dataset.m;store.set('ia_leakm',LEAKM);if(LAST)renderLeak(LAST);});
+/* ===== сквозная аналитика по креативам ===== */
+let CRE={dir:store.get('ia_cdir','all'),view:store.get('ia_cview','tree'),sort:store.get('ia_csort','spend'),top:store.get('ia_ctop',0)};
+const CEXP=new Set();
+const prodOf=name=>{let d=dirOf(name);if(d==='ТЗ_Кар_Шым')d='ТЗ';return PRODUCT_LIST.includes(d)?d:'прочее';};
+function siteOf(ref){const s=String(ref||'').trim();if(!s)return '';let u;try{u=new URL(/^https?:\/\//i.test(s)?s:'https://'+s);}catch(e){return '';}
+  const h=u.hostname.replace(/^www\./,'').toLowerCase();if(!h.includes('.'))return '';return h+u.pathname.replace(/\/+$/,'');}
+function zM(){return {spend:0,impr:0,clicks:0,leads:0,qual:0,sale:0,rev:0,pay:0};}
+function addM(a,b){for(const f in a)a[f]+=b[f]||0;}
+function creData(A){
+  if(!FBADS)return null;
+  const from=A.from,to=A.to,meta=FBADS.meta;
+  const byId={},byCmpName={},byName={},byCmpSet={},adSpendAll={};
+  for(const id in meta){const m=meta[id];let sp=0;const dd=FBADS.daily[id]||{};for(const day in dd)sp+=dd[day][0];adSpendAll[id]=sp;
+    byId[id]=id;const c=norm(m.c),n=norm(m.n),st=norm(m.s);
+    (byCmpName[c+'|'+n]=byCmpName[c+'|'+n]||[]).push(id);(byName[n]=byName[n]||[]).push(id);(byCmpSet[c+'|'+st]=byCmpSet[c+'|'+st]||[]).push(id);}
+  const best=ids=>ids.slice().sort((a,b)=>adSpendAll[b]-adSpendAll[a])[0];
+  const cmpNames={};for(const id in meta)cmpNames[norm(meta[id].c)]=meta[id].c;
+  /* узлы: ad:<id>, а для лидов без распознанного объявления — x:<кампания>|<группа или пусто> */
+  const ads={};
+  const node=(key,c,s,n,id)=>ads[key]||(ads[key]={key,id:id||'',c,s,n,M:zM(),sites:{},meta:id?meta[id]:null});
+  for(const id in meta){const m=meta[id],dd=FBADS.daily[id]||{};const o=node('ad:'+id,m.c,m.s,m.n,id);
+    for(const day in dd){if(day<from||day>to)continue;const v=dd[day];o.M.spend+=v[0];o.M.impr+=v[1];o.M.clicks+=v[2];}}
+  const payBy={};for(const p of A.pays||[]){payBy[p.id]=(payBy[p.id]||0)+p.sum;}
+  let matched=0,unmatched=0,noTag=0;const leadNode={};
+  for(const r of A.R){const c=norm(r.m);if(!cmpNames[c])continue;
+    const a=norm(r.ad),dig=(String(r.ad).match(/\d{10,}/)||[''])[0];let id='';
+    if(a){id=byId[a]||(dig&&byId[dig])||'';if(!id&&byCmpName[c+'|'+a])id=best(byCmpName[c+'|'+a]);if(!id&&byName[a])id=best(byName[a]);}
+    let o;
+    if(id){o=ads['ad:'+id]||node('ad:'+id,meta[id].c,meta[id].s,meta[id].n,id);matched++;}
+    else{const setIds=a&&byCmpSet[c+'|'+a];const sname=setIds?meta[setIds[0]].s:'';o=node('x:'+c+'|'+sname,cmpNames[c],sname||'(группа не определена)','(объявление не определено)','');if(a)unmatched++;else noTag++;}
+    const cl=classify(r);o.M.leads++;if(cl.qual)o.M.qual++;if(cl.sale){o.M.sale++;o.M.rev+=r.b;}if(r.id&&payBy[r.id])o.M.pay+=payBy[r.id];
+    const st=siteOf(r.ref);if(st)o.sites[st]=(o.sites[st]||0)+1;leadNode[r.id||Math.random()]=o.key;}
+  /* дерево */
+  const cmps={};
+  for(const k in ads){const o=ads[k];if(!o.M.spend&&!o.M.leads&&!o.M.clicks)continue;const ck=norm(o.c);
+    const C=cmps[ck]||(cmps[ck]={key:'c:'+ck,ck,name:o.c,dir:prodOf(o.c),M:zM(),sets:{}});
+    const S=C.sets[o.s]||(C.sets[o.s]={key:'s:'+ck+'|'+o.s,name:o.s,M:zM(),ads:[]});
+    S.ads.push(o);addM(S.M,o.M);addM(C.M,o.M);}
+  return {ads,cmps,matched,unmatched,noTag};
+}
+function creMetr(M){const sp=M.spend,rate=ST.rate;return {...M,ctr:M.impr?M.clicks/M.impr*100:null,conv:M.clicks?M.leads/M.clicks*100:null,cpl:sp>0&&M.leads?sp/M.leads:null,cpql:sp>0&&M.qual?sp/M.qual:null,
+  qpct:M.leads?M.qual/M.leads*100:null,cac:sp>0&&M.sale?sp/M.sale:null,romi:sp>0?((M.rev/rate)-sp)/sp*100:null,romiAll:sp>0?((M.pay/rate)-sp)/sp*100:null};}
+function creSortVal(M){const x=creMetr(M),k=CRE.sort;
+  if(k==='cpl'||k==='cpql'){const v=x[k];return v==null?-1e15:-v;}
+  const v=x[k];return v==null?-1e15:v;}
+function creRow(cls,label,M,link,tg){const x=creMetr(M);const n=v=>v==null?dash:v;
+  return '<tr class="'+cls+'"'+(tg?' data-k="'+esc(tg)+'"':'')+'><td class="l'+(tg?' tg':'')+'">'+label+'</td><td class="l">'+(link||'')+'</td>'
+  +'<td>'+(M.spend>0?fKU(M.spend):dash)+'</td><td>'+fI(M.clicks)+'</td><td>'+n(x.ctr==null?null:fP(x.ctr,2))+'</td><td>'+n(x.conv==null?null:fP(x.conv))+'</td>'
+  +'<td>'+fI(M.leads)+'</td><td>'+(x.cpl?fKU(x.cpl):dash)+'</td><td>'+fI(M.qual)+'</td><td>'+n(x.qpct==null?null:fP(x.qpct,0))+'</td><td>'+(x.cpql?fKU(x.cpql):dash)+'</td>'
+  +'<td>'+fI(M.sale)+'</td><td>'+(x.cac?fKU(x.cac):dash)+'</td><td>'+(M.rev?fM(M.rev):dash)+'</td><td>'+(M.pay?fM(M.pay):dash)+'</td><td>'+romiPill(x.romi)+'</td><td>'+romiPill(M.pay?x.romiAll:null)+'</td></tr>';}
+function creLink(o){const m=o.meta;if(!m)return '';let h='';
+  const u=m.l||m.p;if(m.t)h+='<a href="'+esc(u||m.t)+'" target="_blank" rel="noopener"><img class="thumb" loading="lazy" src="'+esc(m.t)+'" alt=""></a> ';
+  if(m.l)h+='<a href="'+esc(m.l)+'" target="_blank" rel="noopener">превью</a>';
+  if(m.p)h+=(m.l?' · ':'')+'<a href="'+esc(m.p)+'" target="_blank" rel="noopener">пост</a>';
+  return h;}
+function renderCre(A){
+  const el=document.getElementById('tCre'),note=document.getElementById('creNote');
+  document.getElementById('creDir').innerHTML=['all'].concat(PRODUCT_LIST).map(d=>'<button class="chip'+(CRE.dir===d?' on':'')+'" data-d="'+d+'">'+(d==='all'?'Все':esc(d))+'</button>').join('');
+  document.querySelectorAll('#creView .chip').forEach(b=>b.classList.toggle('on',b.dataset.v===CRE.view));
+  document.querySelectorAll('#creTop .chip').forEach(b=>b.classList.toggle('on',+b.dataset.t===+CRE.top));
+  document.getElementById('creSort').value=CRE.sort;
+  const D=creData(A);A.cre=D;
+  if(!D){el.innerHTML='<div class="empty">'+(MANUAL?'Для креативов нужны данные из API — при ручной загрузке файлов раздел недоступен.':FBADS_ERR?'Facebook не отдал данные по объявлениям: '+esc(FBADS_ERR):'Скрипт пока не отдаёт данные по объявлениям. Обновите Code.gs в Apps Script, сделайте новую версию развертывания и нажмите «Свежие данные».')+'</div>';note.textContent='';renderSites(A,null);return;}
+  const H='<table><thead><tr><th class="l">'+(CRE.view==='tree'?'Кампания / группа / объявление':'Объявление')+'</th><th class="l">Крео</th><th>Расход</th><th>Клики</th><th>CTR</th><th>Клик→лид</th><th>Лиды</th><th>CPL</th><th>Квалы</th><th>%квал</th><th>CPQL</th><th>Продажи</th><th>CAC</th><th>Выручка, млн ₸</th><th>Оплаты, млн ₸</th><th>ROMI</th><th>ROMI общ.</th></tr></thead><tbody>';
+  const cmps=Object.values(D.cmps).filter(c=>CRE.dir==='all'||c.dir===CRE.dir);
+  const by=(a,b)=>creSortVal(b.M)-creSortVal(a.M);
+  const T=zM();cmps.forEach(c=>addM(T,c.M));
+  let h=H;
+  if(CRE.view==='tree'){
+    let list=cmps.sort(by);if(+CRE.top)list=list.slice(0,+CRE.top);
+    for(const c of list){const open=CEXP.has(c.key);
+      h+=creRow('lv0',(open?'<span class="ar">▾</span>':'<span class="ar">▸</span>')+'<span class="nm" title="'+esc(c.name)+'">'+esc(c.name)+'</span> <small class="mut">'+esc(c.dir)+'</small>',c.M,'',c.key);
+      if(!open)continue;
+      for(const S of Object.values(c.sets).sort(by)){const so=CEXP.has(S.key);
+        h+=creRow('lv1',(so?'<span class="ar">▾</span>':'<span class="ar">▸</span>')+'<span class="nm" title="'+esc(S.name)+'">'+esc(S.name)+'</span> <small class="mut">'+S.ads.length+' объявл.</small>',S.M,'',S.key);
+        if(!so)continue;
+        for(const o of S.ads.slice().sort(by))h+=creRow('lv2'+(o.id?' adrow':''),'<span class="nm" title="'+esc(o.n)+'">'+esc(o.n)+'</span>',o.M,creLink(o));}}
+  }else{
+    let list=[];for(const c of cmps)for(const S of Object.values(c.sets))for(const o of S.ads)list.push(o);
+    list.sort(by);if(+CRE.top)list=list.slice(0,+CRE.top);
+    for(const o of list)h+=creRow('','<span class="nm" title="'+esc(o.n)+'">'+esc(o.n)+'</span><span class="path">'+esc(o.c)+' › '+esc(o.s)+'</span>',o.M,creLink(o));
+  }
+  h+=creRow('total','Итого'+(CRE.dir==='all'?'':' · '+esc(CRE.dir))+(+CRE.top?' <small class="mut">(все, не только ТОП)</small>':''),T,'');
+  el.innerHTML=h+'</tbody></table>';
+  const tot=D.matched+D.unmatched+D.noTag;
+  note.innerHTML=tot?('Лиды рекламных кампаний: '+fI(tot)+' · привязаны к объявлению '+fI(D.matched)+' ('+fP(D.matched/tot*100,0)+')'+(D.noTag?' · без utm_content '+fI(D.noTag):'')+(D.unmatched?' · utm_content не совпал ни с ID, ни с названием объявления '+fI(D.unmatched):'')+'. Непривязанные лиды показаны строкой «(объявление не определено)» внутри своей кампании. ROMI — по продажам amoCRM, ROMI общ. — по оплатам из таблицы.'):'';
+  renderSites(A,D);
+}
+/* ----- сайты ----- */
+function saveSites(){store.set('ia_sites',SITES);const m=document.getElementById('siteMsg');
+  apiGet({action:'setsites',sites:JSON.stringify(SITES)},30000).then(()=>{m.textContent='Сохранено';setTimeout(()=>m.textContent='',2000);}).catch(()=>{m.textContent='Сохранено только в этом браузере (скрипт не ответил)';});}
+function nodeAds(D,nk){const out=[];
+  if(nk.startsWith('ad:')){if(D.ads[nk])out.push(D.ads[nk]);return out;}
+  for(const c of Object.values(D.cmps)){if(nk==='c:'+c.ck){for(const S of Object.values(c.sets))out.push(...S.ads);}
+    else for(const S of Object.values(c.sets))if(nk===S.key)out.push(...S.ads);}
+  return out;}
+function nodeLabel(D,nk){if(nk.startsWith('ad:')){const o=D&&D.ads[nk];return o?o.n:'объявление '+nk.slice(3);}
+  if(nk.startsWith('c:'))return 'Кампания: '+((D&&D.cmps[nk.slice(2)])||{name:nk.slice(2)}).name;
+  const p=nk.slice(2).split('|');return 'Группа: '+p.slice(1).join('|');}
+function renderSites(A,D){
+  const el=document.getElementById('tSite');
+  const leadSites={},fbLeadSites={};
+  for(const r of A.R){const st=siteOf(r.ref);if(!st)continue;leadSites[st]=(leadSites[st]||0)+1;}
+  /* авто: главный сайт каждого объявления */
+  const auto={};
+  if(D)for(const k in D.ads){const o=D.ads[k];let b='',bn=0,tot=0;for(const st in o.sites){tot+=o.sites[st];fbLeadSites[st]=(fbLeadSites[st]||0)+o.sites[st];if(o.sites[st]>bn){bn=o.sites[st];b=st;}}
+    if(b&&bn/tot>=0.5)(auto[b]=auto[b]||[]).push(o);}
+  const names=[...new Set(Object.keys(leadSites).concat(Object.keys(SITES)))].sort((a,b)=>(leadSites[b]||0)-(leadSites[a]||0));
+  if(!names.length){el.innerHTML='<div class="empty">За период нет лидов с заполненным referer. Добавьте сайт вручную и назначьте ему кампании.</div>';A.sites=[];return;}
+  let opts='<option value="">＋ назначить…</option>';
+  if(D)for(const c of Object.values(D.cmps).sort((a,b)=>b.M.spend-a.M.spend)){opts+='<optgroup label="'+esc(c.name)+'"><option value="'+esc(c.key)+'">Вся кампания</option>';
+    for(const S of Object.values(c.sets)){opts+='<option value="'+esc(S.key)+'">— группа: '+esc(S.name)+'</option>';for(const o of S.ads)if(o.id)opts+='<option value="'+esc(o.key)+'">—— '+esc(o.n)+'</option>';}
+    opts+='</optgroup>';}
+  let h='<table><thead><tr><th class="l">Сайт</th><th>Лидов с сайта</th><th>из них с FB</th><th class="l">Объявления сайта</th><th>Расход</th><th>Клики</th><th>Лиды объявл.</th><th>Конверсия</th><th>CPL</th><th>Квалы</th><th>CPQL</th><th>Продажи</th><th>ROMI</th></tr></thead><tbody>';
+  const rows=[];
+  for(const st of names){const man=SITES[st]||[];let list=[];
+    if(D){if(man.length){const seen=new Set();for(const nk of man)for(const o of nodeAds(D,nk))if(!seen.has(o.key)){seen.add(o.key);list.push(o);}}else list=auto[st]||[];}
+    const M=zM();list.forEach(o=>addM(M,o.M));const x=creMetr(M);rows.push({st,M,x,n:list.length,man:man.length});
+    const tags=man.map(nk=>'<span class="tagx">'+esc(nodeLabel(D,nk))+'<button data-site="'+esc(st)+'" data-del="'+esc(nk)+'" title="убрать">×</button></span>').join('');
+    h+='<tr><td class="l">'+esc(st)+'</td><td>'+fI(leadSites[st]||0)+'</td><td>'+fI(fbLeadSites[st]||0)+'</td><td class="asg">'+(tags||(list.length?'<small class="mut">авто: '+list.length+' объявл.</small> ':'<small class="mut">не назначено</small> '))
+      +(D?'<select data-site="'+esc(st)+'">'+opts+'</select>':'')+'</td>'
+      +'<td>'+(M.spend>0?fKU(M.spend):dash)+'</td><td>'+fI(M.clicks)+'</td><td>'+fI(M.leads)+'</td><td>'+(x.conv==null?dash:pill(fP(x.conv),x.conv>=10?'g':x.conv>=5?'w':'b'))+'</td>'
+      +'<td>'+(x.cpl?fKU(x.cpl):dash)+'</td><td>'+fI(M.qual)+'</td><td>'+(x.cpql?fKU(x.cpql):dash)+'</td><td>'+fI(M.sale)+'</td><td>'+romiPill(x.romi)+'</td></tr>';}
+  el.innerHTML=h+'</tbody></table>';A.sites=rows;
+}
+document.getElementById('tSite').addEventListener('change',e=>{const s=e.target.closest('select[data-site]');if(!s||!s.value)return;const st=s.dataset.site;const a=SITES[st]||(SITES[st]=[]);if(!a.includes(s.value))a.push(s.value);saveSites();if(LAST)renderSites(LAST,LAST.cre);});
+document.getElementById('tSite').addEventListener('click',e=>{const b=e.target.closest('button[data-del]');if(!b)return;const st=b.dataset.site;SITES[st]=(SITES[st]||[]).filter(x=>x!==b.dataset.del);if(!SITES[st].length)delete SITES[st];saveSites();if(LAST)renderSites(LAST,LAST.cre);});
+document.getElementById('siteAdd').addEventListener('click',()=>{const i=document.getElementById('siteNew');const st=siteOf(i.value);if(!st){document.getElementById('siteMsg').textContent='Введите адрес сайта, например invictus.kz/quiz';return;}if(!SITES[st])SITES[st]=[];i.value='';saveSites();if(LAST)renderSites(LAST,LAST.cre);});
+document.getElementById('creDir').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;CRE.dir=b.dataset.d;store.set('ia_cdir',CRE.dir);if(LAST)renderCre(LAST);});
+document.getElementById('creView').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;CRE.view=b.dataset.v;store.set('ia_cview',CRE.view);if(LAST)renderCre(LAST);});
+document.getElementById('creTop').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;CRE.top=+b.dataset.t;store.set('ia_ctop',CRE.top);if(LAST)renderCre(LAST);});
+document.getElementById('creSort').addEventListener('change',e=>{CRE.sort=e.target.value;store.set('ia_csort',CRE.sort);if(LAST)renderCre(LAST);});
+document.getElementById('tCre').addEventListener('click',e=>{const t=e.target.closest('tr[data-k]');if(!t)return;const k=t.dataset.k;if(CEXP.has(k))CEXP.delete(k);else CEXP.add(k);if(LAST)renderCre(LAST);});
 function renderLoss(A){
   const N=A.R.length||1;
   document.getElementById('lossTitle').textContent='Куда уходят '+fI(A.R.length)+' лидов';
@@ -775,13 +948,13 @@ function amoRecords(rows){
   const cId=pick(H,['id']);
   const cStage=pick(H,['этап сделки','этап']),cReason=pick(H,['причина отказа','причина']),cBud=pick(H,['бюджет']),cMed=pick(H,['utm_medium']),cCmp=pick(H,['utm_campaign']),cSrc=pick(H,['utm_source']),cForm=pick(H,['formname']),cCrs=pick(H,['курс']),cDate=pick(H,['дата создания','дата']),cTags=pick(H,['теги','тэги','tags']);
   if(!cStage||!cMed||!cDate)throw new Error('Не нашёл колонки «Этап сделки», «utm_medium» и «Дата создания сделки». Это выгрузка сделок amoCRM?');
-  const cNm=pick(H,['название сделки']),cRef=pick(H,['referer','utm_referrer']),cGym=pick(H,['ходит ли в зал']);
+  const cAd=pick(H,['utm_content']),cNm=pick(H,['название сделки']),cRef=pick(H,['referer','utm_referrer']),cGym=pick(H,['ходит ли в зал']);
   const cityCols=H.filter(h=>{const n=norm(h);return n.includes('город')||n.includes('қала')||n.includes('қаладан');});
   const langCols=H.filter(h=>{const n=norm(h);return n.includes('язык')||n.includes('тілі')||n.includes('на_каком')||n.includes('комфортнее');});
   return rows.map(r=>{const first=cols=>{for(const c of cols){const v=String(r[c]||'').trim();if(v)return v;}return '';};
     let m=String(r[cMed]||'').trim();const cmp=String(cCmp?r[cCmp]||'':'').trim(),src=String(cSrc?r[cSrc]||'':'').trim(),tags=String(cTags?r[cTags]||'':'').trim();
     if(!m&&!cmp&&!src&&!tags)m='Сарафанка';
-    return {id:String(cId?r[cId]||'':'').replace(/\.0$/,''),d:toISO(r[cDate]),st:String(r[cStage]||''),rs:String(cReason?r[cReason]||'':''),b:parseFloat(String(cBud?r[cBud]||'0':'0').replace(/[^\d.]/g,''))||0,m,cmp,src,c:first(cityCols),l:first(langCols),fn:String(cForm?r[cForm]||'':''),crs:String(cCrs?r[cCrs]||'':''),tags,nm:String(cNm?r[cNm]||'':''),ref:String(cRef?r[cRef]||'':''),gym:String(cGym?r[cGym]||'':'')};}).filter(r=>r.d);
+    return {id:String(cId?r[cId]||'':'').replace(/\.0$/,''),d:toISO(r[cDate]),st:String(r[cStage]||''),rs:String(cReason?r[cReason]||'':''),b:parseFloat(String(cBud?r[cBud]||'0':'0').replace(/[^\d.]/g,''))||0,m,cmp,src,c:first(cityCols),l:first(langCols),fn:String(cForm?r[cForm]||'':''),crs:String(cCrs?r[cCrs]||'':''),tags,nm:String(cNm?r[cNm]||'':''),ref:String(cRef?r[cRef]||'':''),gym:String(cGym?r[cGym]||'':''),ad:String(cAd?r[cAd]||'':'')};}).filter(r=>r.d);
 }
 function fbRecords(rows){
   if(!rows.length)return [];const H=Object.keys(rows[0]);
@@ -827,6 +1000,13 @@ function buildWorkbook(){
   const l2=[['Утечка по продукту·городу · '+per],['Продукт · город','Метрика'].concat(A.leakRows).concat(['Всего'])];
   for(const x of A.cityRows){const o=A.leak2[x.key];if(!o)continue;for(const [mk,ml] of met){const vs=A.leakRows.map(a=>Math.round((o[a]||{})[mk]||0));l2.push([x.k,ml].concat(vs,[vs.reduce((t,v)=>t+v,0)]));}}
   add('Утечка по городам',l2,[30,12].concat(Array(A.leakRows.length+1).fill(12)));
+  if(A.cre){const cr=[['Креативы · '+per],['Кампания','Группа','Объявление','ID','Направление','Ссылка','Расход ₸','Расход $','Показы','Клики','Клик→лид %','Лиды','CPL ₸','Квалы','CPQL ₸','Продажи','CAC ₸','Выручка ₸','Оплаты ₸','ROMI %','ROMI общ. %']];
+    for(const c of Object.values(A.cre.cmps))for(const S of Object.values(c.sets))for(const o of S.ads){const x=creMetr(o.M),k=v=>v==null?'':Math.round(v*A.rate);const m=o.meta||{};
+      cr.push([o.c,o.s,o.n,o.id,c.dir,m.l||m.p||'',k(o.M.spend),r2(o.M.spend),o.M.impr,o.M.clicks,r1(x.conv),o.M.leads,k(x.cpl),o.M.qual,k(x.cpql),o.M.sale,k(x.cac),Math.round(o.M.rev),Math.round(o.M.pay),r1(x.romi),r1(o.M.pay?x.romiAll:null)]);}
+    add('Креативы',cr,[30,26,30,18,10,30,11,9,9,8,9,7,9,7,9,8,9,12,12,8,9]);}
+  if(A.sites&&A.sites.length){const si=[['Конверсия сайтов · '+per],['Сайт','Объявлений','Назначено вручную','Расход ₸','Клики','Лиды','Конверсия %','CPL ₸','Квалы','Продажи','ROMI %']];
+    for(const z of A.sites)si.push([z.st,z.n,z.man?'да':'авто',Math.round(z.M.spend*A.rate),z.M.clicks,z.M.leads,r1(z.x.conv),z.x.cpl==null?'':Math.round(z.x.cpl*A.rate),z.M.qual,z.M.sale,r1(z.x.romi)]);
+    add('Сайты',si,[36,10,12,11,8,8,10,9,8,8,8]);}
   const lo=[['Этапы и причины закрытия · '+per],['Этап / причина','Лидов','Доля %','Тип']];const tl={q:'квал',x:'мусор / недозвон',s:'продажа','':''};
   Object.keys(A.loss).map(k=>({k,...A.loss[k]})).sort((a,b)=>b.n-a.n).forEach(x=>lo.push([x.k,x.n,r1(x.n/A.R.length*100),tl[x.t]]));add('Потери',lo,[44,10,10,18]);
   {const D=LAST.dyn||dynData(A);const segName=DYN.seg==='all'?'Все лиды':DYN.seg.startsWith('p:')?DYN.seg.slice(2)+' — все города':((A.cityRows.find(x=>x.key===DYN.seg)||{}).k||DYN.seg);
