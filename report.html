@@ -176,7 +176,7 @@ td a{color:var(--accent);text-decoration:none} td a:hover{text-decoration:underl
 <section id="secKel">
   <div class="eyebrow">Рассылки</div>
   <h2>Рассылки Келесу</h2>
-  <p class="lead">Лиды с рассылок Келесу исключены из всех остальных блоков отчёта и считаются только здесь. Лид относится к рассылке, если в utm_source, utm_medium, utm_campaign, тегах, названии сделки или referer есть метка: <b id="kelMarks"></b>. Строка — рассылка (utm_campaign лида).</p>
+  <p class="lead">Лиды с рассылок Келесу исключены из всех остальных блоков отчёта и считаются только здесь. Лид относится к рассылке, если в utm_source, utm_campaign, тегах, названии сделки или referer есть метка <b id="kelMarks"></b> и при этом у него нет рекламного источника: utm_medium, тега tilda или формы Тильды. Рекламные лиды, которым Келесу потом написал, остаются в основной аналитике. Строка — рассылка (utm_campaign лида).</p>
   <div class="ctl">
     <div class="fld"><label for="kelCost">Стоимость рассылок за период, ₸</label><input type="number" id="kelCost" class="pin" style="width:150px" min="0" step="1" placeholder="вручную"></div>
     <span class="note" id="kelApiNote"></span>
@@ -338,7 +338,10 @@ function metaCity(r){const g=GEO[norm(r.m)];if(!g)return '';let sets=null;
 function cityOf(r){if(String(r.c||'').trim())return cityBucket(r.c);if(String(r.cq||'').trim())return cityBucket(r.cq);if(r.nc)return cityBucket(r.nc);return cityBucket(metaCity(r));}
 /* рассылки Келесу */
 const KEL_DEF=['kelesu','келесу'];let KEL_MARKS=KEL_DEF.slice();
-function isKel(r){const t=norm([r.src,r.m,r.cmp,r.tags,r.nm,r.ref].join(' '));return KEL_MARKS.some(k=>t.includes(k));}
+/* лид рассылки = метка Келесу И нет рекламного источника. Тег kelesu Келесу ставит и рекламным лидам, которым потом пишет,
+   поэтому лиды с utm_medium, тегом tilda или формой Тильды остаются в основной аналитике. */
+function kelAdLead(r){const m=norm(r.m);return (m&&m!=='сарафанка'&&!KEL_MARKS.some(k=>m.includes(k)))||norm(r.tags).includes('tilda')||!!String(r.fn||'').trim();}
+function isKel(r){if(kelAdLead(r))return false;const t=norm([r.src,r.m,r.cmp,r.tags,r.nm,r.ref].join(' '));return KEL_MARKS.some(k=>t.includes(k));}
 function lossKey(r){const b=baseStage(r.st);if(b==='закрыто и не реализовано'){const rs=reasonOf(r);return {k:'ЗНР: '+(rs?rs.charAt(0).toUpperCase()+rs.slice(1):'без причины'),t:QR.has(rs)?'q':JUNK.has(rs)?'x':''};}if(SS.has(b))return {k:r.st.trim(),t:'s'};return {k:r.st.trim(),t:QS.has(b)?'q':''};}
 
 /* ===== форматирование ===== */
