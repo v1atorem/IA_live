@@ -134,6 +134,8 @@ td a{color:var(--accent);text-decoration:none} td a:hover{text-decoration:underl
 .cd b{display:block;font-size:11px;color:var(--muted)}.cd span{display:block;font-weight:600;font-size:12.5px}.cd i{display:block;font-style:normal;color:var(--plan)}
 .cd.off{background:var(--surface2);opacity:.7}.cd.ok{border-color:var(--good)}.cd.mid{border-color:var(--warn)}.cd.low{border-color:var(--bad)}
 .empty{padding:28px;text-align:center;color:var(--muted)}
+th.sepl,td.sepl{border-left:2px solid var(--border)}
+th.rq{color:var(--warn)} th.rx{color:var(--bad)}
 .kpihead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
 </style>
 
@@ -257,8 +259,8 @@ td a{color:var(--accent);text-decoration:none} td a:hover{text-decoration:underl
       <div class="bars" id="lossBars"></div></div>
     <div class="panel"><h3>Из чего состоят квалы</h3><div class="bars" id="qualBars"></div><p class="note" id="qualNote" style="margin-top:12px"></p></div>
   </div>
-  <h3 style="font:600 16px var(--f-body);margin:8px 0 0">Лиды в работе по этапам · продукт × город</h3>
-  <p class="lead">Только незакрытые лиды (не продажа и не «Закрыто и не реализовано»). Ячейка: число лидов · % от всех лидов строки.</p>
+  <h3 style="font:600 16px var(--f-body);margin:8px 0 0">Лиды по этапам и причинам отказа · продукт × город</h3>
+  <p class="lead">Слева — лиды в работе по этапам, справа — продажи и «Закрыто и не реализовано» с разбивкой по каждой причине отказа (жёлтым — причины, которые считаются квалом, красным — мусор и недозвон). Ячейка: число лидов · % от всех лидов строки.</p>
   <div class="tscroll" id="tWork"></div>
 </section>
 
@@ -1001,20 +1003,31 @@ function renderLoss(A){
   document.getElementById('qualBars').innerHTML=q.map(x=>'<div class="brow"><span class="lbl">'+x[0]+'</span><div class="track"><div class="fill '+x[2]+'" style="width:'+(x[1]/qm*100).toFixed(1)+'%"></div></div><span class="n">'+fI(x[1])+pc(x[1])+'</span></div>').join('');
   const qt=A.qClosed+A.qSale+A.qWork;
   document.getElementById('qualNote').textContent=qt?'Квалы — '+fP(qt/N*100)+' всех лидов. '+Math.round(A.qClosed/qt*100)+'% квалов уже закрыты без оплаты; «В следующий раз» и «Гасится» — база для дожима.':'';
-  const work={},stCount={},rowTot={};
-  A.R.forEach((r,i)=>{const k=A.leadRows[i];rowTot[k]=(rowTot[k]||0)+1;const b=baseStage(r.st);if(b==='закрыто и не реализовано'||SS.has(b))return;
+  /* по строкам плана: открытые этапы, продажи, закрытые без оплаты и каждая причина отказа */
+  const work={},stCount={},rowTot={},sale={},closed={},rsn={},rsCount={},rsType={};let saleT=0,closedT=0;
+  const rsLabel=rs=>rs?rs.charAt(0).toUpperCase()+rs.slice(1):'Без причины';
+  A.R.forEach((r,i)=>{const k=A.leadRows[i];rowTot[k]=(rowTot[k]||0)+1;const b=baseStage(r.st);
+    if(SS.has(b)){sale[k]=(sale[k]||0)+1;saleT++;return;}
+    if(b==='закрыто и не реализовано'){const rs0=reasonOf(r),rs=rsLabel(rs0);closed[k]=(closed[k]||0)+1;closedT++;rsCount[rs]=(rsCount[rs]||0)+1;
+      rsType[rs]=QR.has(rs0)?'q':JUNK.has(rs0)?'x':'';const o=rsn[k]||(rsn[k]={});o[rs]=(o[rs]||0)+1;return;}
     const st=r.st.trim()||'(без этапа)';stCount[st]=(stCount[st]||0)+1;const o=work[k]||(work[k]={});o[st]=(o[st]||0)+1;});
   const sts=Object.keys(stCount).sort((a,b)=>stCount[b]-stCount[a]);
-  if(!sts.length){document.getElementById('tWork').innerHTML='<div class="empty">Нет лидов в работе</div>';A.work=null;return;}
-  let h='<table><thead><tr><th class="l">Продукт · город</th><th>Лидов</th><th>В работе</th>'+sts.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>';
+  const rss=Object.keys(rsCount).sort((a,b)=>rsCount[b]-rsCount[a]);
+  if(!A.R.length){document.getElementById('tWork').innerHTML='<div class="empty">Нет лидов за период</div>';A.work=null;return;}
+  const thR=rs=>'<th class="'+(rsType[rs]==='q'?'rq':rsType[rs]==='x'?'rx':'')+'" title="'+(rsType[rs]==='q'?'считается квалом':rsType[rs]==='x'?'мусор / недозвон':'')+'">'+esc(rs)+'</th>';
+  const NC=sts.length+rss.length+5;
+  let h='<table><thead><tr><th class="l">Продукт · город</th><th>Лидов</th><th>В работе</th>'+sts.map(x=>'<th>'+esc(x)+'</th>').join('')
+    +'<th class="sepl">Продажа</th><th class="sepl">Закрыто без оплаты</th>'+rss.map(thR).join('')+'</tr></thead><tbody>';
   let cur='';const cell=(n,t)=>n?fI(n)+' <small class="mut">'+fP(n/t*100,0)+'</small>':'<span class="mut">·</span>';
-  for(const x of A.cityRows){const o=work[x.key]||{},t=rowTot[x.key]||0;if(!t)continue;const w=Object.values(o).reduce((a,b)=>a+b,0);
-    if(x.dir!==cur){cur=x.dir;h+='<tr class="grp"><td colspan="'+(sts.length+3)+'"><span class="gl">'+esc(cur)+'</span></td></tr>';}
-    h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(t)+'</td><td><b>'+cell(w,t)+'</b></td>'+sts.map(st=>'<td>'+cell(o[st]||0,t)+'</td>').join('')+'</tr>';}
-  const W=sts.reduce((a,st)=>a+stCount[st],0);
-  h+='<tr class="total"><td class="l">Итого</td><td>'+fI(A.R.length)+'</td><td>'+cell(W,A.R.length)+'</td>'+sts.map(st=>'<td>'+cell(stCount[st],A.R.length)+'</td>').join('')+'</tr>';
+  for(const x of A.cityRows){const o=work[x.key]||{},rr=rsn[x.key]||{},t=rowTot[x.key]||0;if(!t)continue;const w=Object.values(o).reduce((a,b)=>a+b,0);
+    if(x.dir!==cur){cur=x.dir;h+='<tr class="grp"><td colspan="'+NC+'"><span class="gl">'+esc(cur)+'</span></td></tr>';}
+    h+='<tr><td class="l">'+esc(x.k)+'</td><td>'+fI(t)+'</td><td><b>'+cell(w,t)+'</b></td>'+sts.map(st=>'<td>'+cell(o[st]||0,t)+'</td>').join('')
+      +'<td class="sepl">'+cell(sale[x.key]||0,t)+'</td><td class="sepl"><b>'+cell(closed[x.key]||0,t)+'</b></td>'+rss.map(rs=>'<td>'+cell(rr[rs]||0,t)+'</td>').join('')+'</tr>';}
+  const W=sts.reduce((a,st)=>a+stCount[st],0),NT=A.R.length;
+  h+='<tr class="total"><td class="l">Итого</td><td>'+fI(NT)+'</td><td>'+cell(W,NT)+'</td>'+sts.map(st=>'<td>'+cell(stCount[st],NT)+'</td>').join('')
+    +'<td class="sepl">'+cell(saleT,NT)+'</td><td class="sepl">'+cell(closedT,NT)+'</td>'+rss.map(rs=>'<td>'+cell(rsCount[rs],NT)+'</td>').join('')+'</tr>';
   document.getElementById('tWork').innerHTML=h+'</tbody></table>';
-  A.work={sts,work,rowTot,stCount};
+  A.work={sts,work,rowTot,stCount,rss,rsn,rsCount,rsType,sale,closed,saleT,closedT};
 }
 
 /* ===== период ===== */
@@ -1122,6 +1135,11 @@ function buildWorkbook(){
     add('Сайты',si,[36,10,12,11,8,8,10,9,8,8,8]);}
   const lo=[['Этапы и причины закрытия · '+per],['Этап / причина','Лидов','Доля %','Тип']];const tl={q:'квал',x:'мусор / недозвон',s:'продажа','':''};
   Object.keys(A.loss).map(k=>({k,...A.loss[k]})).sort((a,b)=>b.n-a.n).forEach(x=>lo.push([x.k,x.n,r1(x.n/A.R.length*100),tl[x.t]]));add('Потери',lo,[44,10,10,18]);
+  if(A.work){const w=A.work,ws=[['Этапы и причины отказа по продукту · городу · '+per],['Продукт · город','Лидов','В работе'].concat(w.sts,['Продажа','Закрыто без оплаты'],w.rss.map(rs=>'Отказ: '+rs))];
+    for(const x of A.cityRows){const t=w.rowTot[x.key]||0;if(!t)continue;const o=w.work[x.key]||{},rr=w.rsn[x.key]||{};
+      ws.push([x.k,t,Object.values(o).reduce((a,b)=>a+b,0)].concat(w.sts.map(s=>o[s]||0),[w.sale[x.key]||0,w.closed[x.key]||0],w.rss.map(rs=>rr[rs]||0)));}
+    ws.push(['Итого',A.R.length,w.sts.reduce((a,s)=>a+w.stCount[s],0)].concat(w.sts.map(s=>w.stCount[s]),[w.saleT,w.closedT],w.rss.map(rs=>w.rsCount[rs])));
+    add('Этапы и отказы',ws,[30,8,10].concat(Array(w.sts.length+w.rss.length+2).fill(14)));}
   {const D=LAST.dyn||dynData(A);const segName=DYN.seg==='all'?'Все лиды':DYN.seg.startsWith('p:')?DYN.seg.slice(2)+' — все города':((A.cityRows.find(x=>x.key===DYN.seg)||{}).k||DYN.seg);
   const dd=[['Динамика · '+segName+' · '+per],[DYN.gran==='week'?'Неделя':'День','Лиды','План','CPL ₸','Квал','%квал','CPQL ₸','Продажи новые','CAC ₸','Выручка новых ₸','Оплаты, шт','Оплаты ₸','Расход ₸','Расход $','ROMI новые %','ROMI общий %']];
   for(const x of D.rows.concat([{lbl:'Итого',M:D.T,plan:D.plan}])){const M=x.M;const k=v=>v==null?'':Math.round(v*A.rate);dd.push([x.lbl,M.leads,Math.round(x.plan),k(M.cpl),M.qual,r1(M.qpct),k(M.cpql),M.sale,k(M.cac),Math.round(M.rev),M.pn||0,Math.round(M.ps||0),k(M.spend),r2(M.spend),r1(M.romi),r1(M.romiAll)]);}
