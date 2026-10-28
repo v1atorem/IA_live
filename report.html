@@ -178,7 +178,7 @@ th.rq{color:var(--warn)} th.rx{color:var(--bad)}
 <section id="secKel">
   <div class="eyebrow">Рассылки</div>
   <h2>Рассылки Келесу</h2>
-  <p class="lead">Строка — рассылка из Келесу: доставлено и прочитано берутся из API. Ответившие — сделки amoCRM, у контакта которых телефон из списка получателей и которые созданы в течение <b id="kelWin">7</b> дн. после отправки (если рассылок несколько — засчитывается последняя перед сделкой). Сделки с рекламным источником (utm_medium, тег tilda, форма Тильды) остаются в рекламной аналитике. Лиды рассылок исключены из всех остальных блоков отчёта. Если API Келесу недоступно, лиды определяются по метке <b id="kelMarks"></b>.</p>
+  <p class="lead">Строка — рассылка из Келесу: доставлено и прочитано берутся из API. Ответившие — сделки amoCRM, у контакта которых телефон из списка получателей и которые созданы в течение <b id="kelWin">7</b> дн. после отправки (если рассылок несколько — засчитывается последняя перед сделкой). Сделки с рекламным источником (utm_medium, тег tilda, форма Тильды) остаются в рекламной аналитике. Лиды рассылок исключены из всех остальных блоков отчёта. Метка <b id="kelMarks"></b> в тегах и utm используется только если API Келесу недоступно: её ставит интеграция Келесу почти всем сделкам, которые пишут в WhatsApp, поэтому сама по себе она не означает ответ на рассылку.</p>
   <div class="kpis" id="kelKpis"></div>
   <div class="ctl">
     <div class="fld"><label for="kelCost">Стоимость рассылок за период, ₸</label><input type="number" id="kelCost" class="pin" style="width:150px" min="0" step="1" placeholder="вручную"></div>
@@ -347,7 +347,7 @@ const KEL_DEF=['kelesu','келесу'];let KEL_MARKS=KEL_DEF.slice();
    поэтому лиды с utm_medium, тегом tilda или формой Тильды остаются в основной аналитике. */
 function kelAdLead(r){const m=norm(r.m);return (m&&m!=='сарафанка'&&!KEL_MARKS.some(k=>m.includes(k)))||norm(r.tags).includes('tilda')||!!String(r.fn||'').trim();}
 function kelMatch(r){return KELAPI&&KELAPI.leads?KELAPI.leads[r.id]||null:null;}
-function isKel(r){if(kelAdLead(r))return false;if(kelMatch(r))return true;const t=norm([r.src,r.m,r.cmp,r.tags,r.nm,r.ref].join(' '));return KEL_MARKS.some(k=>t.includes(k));}
+function isKel(r){if(kelAdLead(r))return false;if(KELAPI&&KELAPI.leads)return !!kelMatch(r);const t=norm([r.src,r.m,r.cmp,r.tags,r.nm,r.ref].join(' '));return KEL_MARKS.some(k=>t.includes(k));}
 function lossKey(r){const b=baseStage(r.st);if(b==='закрыто и не реализовано'){const rs=reasonOf(r);return {k:'ЗНР: '+(rs?rs.charAt(0).toUpperCase()+rs.slice(1):'без причины'),t:QR.has(rs)?'q':JUNK.has(rs)?'x':''};}if(SS.has(b))return {k:r.st.trim(),t:'s'};return {k:r.st.trim(),t:QS.has(b)?'q':''};}
 
 /* ===== форматирование ===== */
@@ -416,7 +416,7 @@ async function loadWindow(win,force){
     applyApi(d,win);
     if(!FBADS){try{setLoading(true,'Лиды загружены. Загружаю объявления Facebook для раздела креативов…');applyAds(await apiGet({action:'ads',from:win[0],to:win[1],force:force?1:0}));}catch(e){FBADS=null;FBADS_ERR=String(e&&e.message||e);}}
     try{const c=await apiGet({action:'calendar',from:win[0],to:win[1]},60000);CAL=(c&&c.days&&!c.error&&Object.keys(c.days).length)?c:null;}catch(e){CAL=null;}
-    try{setLoading(true,'Загружаю рассылки Келесу и сверяю получателей с лидами по телефону…');let kz=await apiGet({action:'kelesu',from:win[0],to:win[1],force:force?1:0},330000);if(typeof kz==='string')kz=JSON.parse(kz);if(kz&&!kz.error&&Array.isArray(kz.items)){KELAPI=kz;KELAPI_ERR='';}else{KELAPI=null;KELAPI_ERR=kz&&kz.error?String(kz.error):'нет ответа';}}catch(e){KELAPI=null;KELAPI_ERR=String(e&&e.message||e);}
+    try{setLoading(true,'Загружаю рассылки Келесу и сверяю получателей с лидами по телефону…');let kz=await apiGet({action:'kelesu',from:win[0],to:win[1],force:force?1:0},330000);if(typeof kz==='string')kz=JSON.parse(kz);if(kz&&!kz.error&&Array.isArray(kz.items)){KELAPI=kz;KELAPI_ERR='';}else{KELAPI=null;KELAPI_ERR=kz&&kz.error?String(kz.error):(kz?'ответ без данных: '+JSON.stringify(kz).slice(0,200):'пустой ответ — скорее всего, в Apps Script не опубликована новая версия');}}catch(e){KELAPI=null;KELAPI_ERR=String(e&&e.message||e);}
     document.getElementById('exportMsg').hidden=true;
   }catch(err){showMsg('Не удалось загрузить данные из API: '+err.message+'. Можно загрузить выгрузки вручную кнопками «amoCRM файл» и «FB файл».','err');}
   finally{setLoading(false);}
