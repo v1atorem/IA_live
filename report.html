@@ -275,7 +275,7 @@ th.rq{color:var(--warn)} th.rx{color:var(--bad)}
 
 <script>
 /* ===== API (тот же бэкенд Apps Script, что и в инструменте) ===== */
-const API_URL = "https://script.google.com/macros/s/AKfycbwbrrIv72eyCh1-WyGqPGTGNGJj3nm-SpOCGhZe-_x-BAuDQcMmZj8BroflNsnB0G8f/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzjcvaHlmQjwDzDzNSTLBuwbdxu-bav1tLNup8hzbR9-koo88Mho34mo71tnGLcs2wP/exec";
 function apiGet(params,timeoutMs){return new Promise((resolve,reject)=>{
   const cb='__ia'+(apiGet.n=(apiGet.n||0)+1)+'_'+Date.now();const s=document.createElement('script');let done=false;
   const to=setTimeout(()=>{if(done)return;done=true;cleanup();reject(new Error('API не ответил вовремя'));},timeoutMs||190000);
