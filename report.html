@@ -162,6 +162,7 @@ th.rq{color:var(--warn)} th.rx{color:var(--bad)}
   <div class="fld"><label for="p1">План 1, лиды/мес</label><input type="number" id="p1" min="0" step="1"></div>
   <div class="fld"><label for="p2">План 2, лиды/мес</label><input type="number" id="p2" min="0" step="1"></div>
   <div class="fld"><label for="rate">Курс ₸/$</label><input type="number" id="rate" min="1" step="1"></div>
+  <div class="fld"><label for="pipeSel">Воронка amoCRM</label><select id="pipeSel" class="sel"><option value="all">Все воронки</option></select></div>
   <div class="status" id="status"></div>
 </div>
 <div id="exportMsg" hidden class="msg"></div>
@@ -275,7 +276,7 @@ th.rq{color:var(--warn)} th.rx{color:var(--bad)}
 
 <script>
 /* ===== API (тот же бэкенд Apps Script, что и в инструменте) ===== */
-const API_URL = "https://script.google.com/macros/s/AKfycbxoO3eNgjISZv6J7Y_8RsxLWSAMgoEb3VpLk-FispHZ9a_tpSX55vq5AQXZMVoL0PZS/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxcrFFl2-_rubJqeIMFTO-GBDQv_mQ1CDdF4mKsPIKZ0_Zqag6Nq3nf74r3F4Bm-0-y/exec";
 function apiGet(params,timeoutMs){return new Promise((resolve,reject)=>{
   const cb='__ia'+(apiGet.n=(apiGet.n||0)+1)+'_'+Date.now();const s=document.createElement('script');let done=false;
   const to=setTimeout(()=>{if(done)return;done=true;cleanup();reject(new Error('API не ответил вовремя'));},timeoutMs||190000);
@@ -373,6 +374,7 @@ const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.
 SITES=store.get('ia_sites',{});
 let ST={unk:store.get('ia_unk','ТЗ'),from:'',to:'',p1:store.get('ia_p1',3400),p2:store.get('ia_p2',3257),rate:store.get('ia_rate',465),preset:'all'};
 let KDIR=store.get('ia_kdir','all');
+let PIPE=store.get('ia_pipe','all');
 let LAST=null;
 
 const todayISO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
@@ -385,7 +387,7 @@ function applyApi(d,win){
   if(!d||d.error)throw new Error(d&&d.error?d.error:'пустой ответ API');
   if(!Array.isArray(d.records))throw new Error('API не вернул лиды');
   LEADS=d.records.map(r=>{let m=String(r.m||'').trim();const has=m||String(r.cmp||'').trim()||String(r.src||'').trim()||String(r.tags||'').trim();if(!has)m='Сарафанка';
-    return {id:String(r.id==null?'':r.id).replace(/\.0$/,''),d:String(r.d||'').slice(0,10),st:String(r.st||''),rs:String(r.rs||''),b:+r.b||0,m,cmp:String(r.cmp||''),src:String(r.src||''),c:String(r.c||''),cq:String(r.cq||''),nc:String(r.nc||''),l:String(r.l||''),fn:String(r.fn||''),crs:String(r.crs||''),pq:String(r.pq||''),np:String(r.np||''),tags:String(r.tags||''),nm:String(r.nm||''),ref:String(r.ref||''),gym:String(r.gym||''),ad:String(r.ad||''),trm:String(r.trm||'')};}).filter(r=>r.d);
+    return {id:String(r.id==null?'':r.id).replace(/\.0$/,''),d:String(r.d||'').slice(0,10),st:String(r.st||''),rs:String(r.rs||''),b:+r.b||0,m,cmp:String(r.cmp||''),src:String(r.src||''),c:String(r.c||''),cq:String(r.cq||''),nc:String(r.nc||''),l:String(r.l||''),fn:String(r.fn||''),crs:String(r.crs||''),pq:String(r.pq||''),np:String(r.np||''),tags:String(r.tags||''),nm:String(r.nm||''),ref:String(r.ref||''),gym:String(r.gym||''),ad:String(r.ad||''),trm:String(r.trm||''),pl:String(r.pl||'')};}).filter(r=>r.d);
   const k=d.fbCur==='kzt'?1/ST.rate:1;FB=[];
   if(d.fbDaily&&typeof d.fbDaily==='object'){for(const camp in d.fbDaily){const days=d.fbDaily[camp];for(const day in days){const x=days[day]||{};FB.push({camp,day:String(day).slice(0,10),spend:(+x.spend||0)*k,impr:+x.impr||0,clicks:+x.clicks||0,from:'',to:''});}}}
   else if(d.fbData&&typeof d.fbData==='object'){for(const camp in d.fbData){const x=d.fbData[camp]||{};FB.push({camp,day:'',spend:(+x.spend||0)*k,impr:+x.impr||0,clicks:+x.clicks||0,from:win[0],to:win[1]});}}
@@ -460,7 +462,7 @@ function planDays(from,to){let s=0;for(let d=from;d<=to;d=addDays(d,1))s+=1/days
 
 function compute(){
   const {from,to,rate}=ST;
-  const all0=WIN&&!MANUAL?LEADS.filter(r=>r.d>=WIN[0]&&r.d<=WIN[1]):LEADS;
+  const all0=(WIN&&!MANUAL?LEADS.filter(r=>r.d>=WIN[0]&&r.d<=WIN[1]):LEADS).filter(r=>PIPE==='all'||r.pl===PIPE);
   /* рассылки Келесу — отдельно, из остальных блоков исключены; город лида считаем один раз */
   const all=[],kelAll=[];
   for(const r of all0){r._cb=cityOf(r);(isKel(r)?kelAll:all).push(r);}
@@ -621,7 +623,16 @@ function kpiFor(A){
 function romiPill(v){return v==null?dash:pill(fP(v,0),v>=0?'g':'b');}
 function planPill(f,p){if(!p)return dash;const v=f/p*100;return pill(Math.round(v)+'%',v>=100?'g':v>=85?'w':'b');}
 function dev(f,p){const d=Math.round(f-p);return '<span style="color:var('+(d>=0?'--good':'--bad')+')">'+(d>0?'+':d<0?'−':'')+fI(Math.abs(d))+'</span>';}
+function renderPipes(){
+  const sel=document.getElementById('pipeSel'),cnt={};let tot=0;
+  for(const r of LEADS){if(r.d<ST.from||r.d>ST.to)continue;tot++;const k=r.pl||'(не указана)';cnt[k]=(cnt[k]||0)+1;}
+  const names=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
+  if(PIPE!=='all'&&!names.includes(PIPE)&&LEADS.length)PIPE='all';
+  sel.innerHTML='<option value="all">Все воронки · '+fI(tot)+'</option>'+names.map(n=>'<option value="'+esc(n)+'"'+(PIPE===n?' selected':'')+'>'+esc(n)+' · '+fI(cnt[n])+'</option>').join('');
+  sel.disabled=names.length<2&&PIPE==='all';
+}
 function render(){
+  renderPipes();
   const A=compute();
   document.getElementById('periodLbl').textContent='Итог периода '+ddmm(A.from)+' – '+ddmm(A.to)+' · '+A.days+' дн.';
   document.getElementById('kpiDir').innerHTML=['all'].concat(PRODUCT_LIST).map(d=>'<button class="chip'+(KDIR===d?' on':'')+'" data-d="'+esc(d)+'">'+(d==='all'?'Все направления':esc(d))+'</button>').join('');
@@ -647,6 +658,7 @@ function render(){
   renderKel(A);renderDir(A);renderCity(A);renderPlan(A);renderChart(A);renderLeak(A);renderCre(A);renderLoss(A);
   document.getElementById('status').innerHTML='<span>Лиды: <b>'+esc(srcAmo)+'</b> · '+fI(LEADS.length)+' сделок</span><span>Расход: <b>'+esc(srcFb)+'</b></span>';
 }
+document.getElementById('pipeSel').addEventListener('change',e=>{PIPE=e.target.value;store.set('ia_pipe',PIPE);render();});
 document.getElementById('kpiDir').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;KDIR=b.dataset.d;store.set('ia_kdir',KDIR);render();});
 
 /* ----- рассылки Келесу ----- */
