@@ -412,13 +412,13 @@ async function loadWindow(win,force){
   try{
     try{const m=await apiGet({action:'getmap'},30000);let mm=(m&&m.map!=null)?m.map:m;if(typeof mm==='string')mm=JSON.parse(mm);if(mm&&mm.map&&typeof mm.map==='object')MAP=mm.map;else if(mm&&typeof mm==='object'&&!mm.error)MAP=mm;}catch(e){}
     try{const z=await apiGet({action:'getsites'},30000);let v=z&&z.sites;if(typeof v==='string'&&v)v=JSON.parse(v);if(v&&typeof v==='object'&&!Array.isArray(v)){SITES=v;store.set('ia_sites',SITES);}}catch(e){}
-    const d=await apiGet({action:'data',from:win[0],to:win[1],force:force?1:0});
+    const d=await apiGet({action:'data',from:win[0],to:win[1],force:force?1:0},360000);
     applyApi(d,win);
-    if(!FBADS){try{setLoading(true,'Лиды загружены. Загружаю объявления Facebook для раздела креативов…');applyAds(await apiGet({action:'ads',from:win[0],to:win[1],force:force?1:0}));}catch(e){FBADS=null;FBADS_ERR=String(e&&e.message||e);}}
+    if(!FBADS){try{setLoading(true,'Лиды загружены. Загружаю объявления Facebook для раздела креативов…');applyAds(await apiGet({action:'ads',from:win[0],to:win[1],force:force?1:0},360000));}catch(e){FBADS=null;FBADS_ERR=String(e&&e.message||e);}}
     try{const c=await apiGet({action:'calendar',from:win[0],to:win[1]},60000);CAL=(c&&c.days&&!c.error&&Object.keys(c.days).length)?c:null;}catch(e){CAL=null;}
     try{setLoading(true,'Загружаю рассылки Келесу и сверяю получателей с лидами по телефону…');let kz=await apiGet({action:'kelesu',from:win[0],to:win[1],force:force?1:0},330000);if(typeof kz==='string')kz=JSON.parse(kz);if(kz&&!kz.error&&Array.isArray(kz.items)){KELAPI=kz;KELAPI_ERR='';}else{KELAPI=null;KELAPI_ERR=kz&&kz.error?String(kz.error):(kz?'ответ без данных: '+JSON.stringify(kz).slice(0,200):'пустой ответ — скорее всего, в Apps Script не опубликована новая версия');}}catch(e){KELAPI=null;KELAPI_ERR=String(e&&e.message||e);}
     document.getElementById('exportMsg').hidden=true;
-  }catch(err){showMsg('Не удалось загрузить данные из API: '+err.message+'. Можно загрузить выгрузки вручную кнопками «amoCRM файл» и «FB файл».','err');}
+  }catch(err){showMsg('Не удалось загрузить данные из API: '+err.message+'.'+(/вовремя/.test(err.message)?' Скрипт мог успеть всё собрать уже после обрыва — подождите 1–2 минуты и нажмите «Загрузить данные» ещё раз, ответ придёт из кэша.':'')+' Можно загрузить выгрузки вручную кнопками «amoCRM файл» и «FB файл».','err');}
   finally{setLoading(false);}
 }
 /* auto=true — смена дат/пресета: до первой ручной загрузки ничего не грузим */
