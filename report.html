@@ -178,11 +178,14 @@ th.rq{color:var(--warn)} th.rx{color:var(--bad)}
 <section id="secKel">
   <div class="eyebrow">Рассылки</div>
   <h2>Рассылки Келесу</h2>
-  <p class="lead">Лиды с рассылок Келесу исключены из всех остальных блоков отчёта и считаются только здесь. Лид относится к рассылке, если в utm_source, utm_campaign, тегах, названии сделки или referer есть метка <b id="kelMarks"></b> и при этом у него нет рекламного источника: utm_medium, тега tilda или формы Тильды. Рекламные лиды, которым Келесу потом написал, остаются в основной аналитике. Строка — рассылка (utm_campaign лида).</p>
+  <p class="lead">Строка — рассылка из Келесу: доставлено и прочитано берутся из API. Ответившие — сделки amoCRM, у контакта которых телефон из списка получателей и которые созданы в течение <b id="kelWin">7</b> дн. после отправки (если рассылок несколько — засчитывается последняя перед сделкой). Сделки с рекламным источником (utm_medium, тег tilda, форма Тильды) остаются в рекламной аналитике. Лиды рассылок исключены из всех остальных блоков отчёта. Если API Келесу недоступно, лиды определяются по метке <b id="kelMarks"></b>.</p>
+  <div class="kpis" id="kelKpis"></div>
   <div class="ctl">
     <div class="fld"><label for="kelCost">Стоимость рассылок за период, ₸</label><input type="number" id="kelCost" class="pin" style="width:150px" min="0" step="1" placeholder="вручную"></div>
+    <div class="fld"><label for="kelSel">Воронка</label><select id="kelSel" class="sel"></select></div>
     <span class="note" id="kelApiNote"></span>
   </div>
+  <div class="panel"><div class="bars" id="kelFunnel"></div></div>
   <div class="tscroll" id="tKel"></div>
 </section>
 
@@ -266,7 +269,7 @@ th.rq{color:var(--warn)} th.rx{color:var(--bad)}
 
 <section>
   <div class="eyebrow">Методика</div>
-  <p class="note">Данные не грузятся при открытии страницы: выберите период и нажмите «Загрузить данные». Страница забирает из API (Apps Script → amoCRM и Facebook) лиды и расход по дням за месяц(ы), в которые попадает период, и фильтрует по датам; после первой загрузки смена дат подгружает новые месяцы сама. Лиды рассылок Келесу исключаются из всех блоков, кроме «Рассылки Келесу». Продукт лида ищется по порядку: поле «Курс» в amoCRM → ответ квиза Тильды → примечания сделки → направление рекламной кампании в Meta → форма, ссылка, теги, язык, анкета → продукт по умолчанию. Город — поле «Город» в amoCRM → квиз Тильды → примечания → геотаргетинг группы объявлений (только если группа нацелена на один из четырёх городов). Привязка кампаний к направлениям — из вкладки «Маппинг» инструмента, для новых кампаний — автоматически по названию (tz → ТЗ, gp/гп → ГП, kar/shym → ТЗ_Кар_Шым, kaz → ТЗ_каз, bust → Bust_plus). Квал — этап «Оффер озвучен + дедлайн», «Наработка», «Счёт выставлен», «Отказ банка», «Ответил на рассылку», продажа, либо закрыто с причиной «Дорого», «Пропала потребность», «В следующий раз», «Гасится», «Выбрали других», «Отказ рассрочки от банка». Продажа — «Предоплата / траншевая оплата» или «Успешно реализовано», выручка из поля «Бюджет». Период фильтрует лиды по дате создания сделки. Расход FB: если в выгрузке есть разбивка по дням (колонка «День»), берутся дни периода; если выгрузка за весь месяц одной строкой, расход делится пропорционально дням периода. Файлы, загруженные вручную, заменяют данные API до перезагрузки страницы.</p>
+  <p class="note">Данные не грузятся при открытии страницы: выберите период и нажмите «Загрузить данные». Страница забирает из API (Apps Script → amoCRM и Facebook) лиды и расход по дням за месяц(ы), в которые попадает период, и фильтрует по датам; после первой загрузки смена дат подгружает новые месяцы сама. Лиды рассылок Келесу (сделки, совпавшие по телефону с получателями рассылки, без рекламного источника) исключаются из всех блоков, кроме «Рассылки Келесу». Продукт лида ищется по порядку: поле «Курс» в amoCRM → ответ квиза Тильды → примечания сделки → направление рекламной кампании в Meta → форма, ссылка, теги, язык, анкета → продукт по умолчанию. Город — поле «Город» в amoCRM → квиз Тильды → примечания → геотаргетинг группы объявлений (только если группа нацелена на один из четырёх городов). Привязка кампаний к направлениям — из вкладки «Маппинг» инструмента, для новых кампаний — автоматически по названию (tz → ТЗ, gp/гп → ГП, kar/shym → ТЗ_Кар_Шым, kaz → ТЗ_каз, bust → Bust_plus). Квал — этап «Оффер озвучен + дедлайн», «Наработка», «Счёт выставлен», «Отказ банка», «Ответил на рассылку», продажа, либо закрыто с причиной «Дорого», «Пропала потребность», «В следующий раз», «Гасится», «Выбрали других», «Отказ рассрочки от банка». Продажа — «Предоплата / траншевая оплата» или «Успешно реализовано», выручка из поля «Бюджет». Период фильтрует лиды по дате создания сделки. Расход FB: если в выгрузке есть разбивка по дням (колонка «День»), берутся дни периода; если выгрузка за весь месяц одной строкой, расход делится пропорционально дням периода. Файлы, загруженные вручную, заменяют данные API до перезагрузки страницы.</p>
 </section>
 </div>
 
@@ -343,7 +346,8 @@ const KEL_DEF=['kelesu','келесу'];let KEL_MARKS=KEL_DEF.slice();
 /* лид рассылки = метка Келесу И нет рекламного источника. Тег kelesu Келесу ставит и рекламным лидам, которым потом пишет,
    поэтому лиды с utm_medium, тегом tilda или формой Тильды остаются в основной аналитике. */
 function kelAdLead(r){const m=norm(r.m);return (m&&m!=='сарафанка'&&!KEL_MARKS.some(k=>m.includes(k)))||norm(r.tags).includes('tilda')||!!String(r.fn||'').trim();}
-function isKel(r){if(kelAdLead(r))return false;const t=norm([r.src,r.m,r.cmp,r.tags,r.nm,r.ref].join(' '));return KEL_MARKS.some(k=>t.includes(k));}
+function kelMatch(r){return KELAPI&&KELAPI.leads?KELAPI.leads[r.id]||null:null;}
+function isKel(r){if(kelAdLead(r))return false;if(kelMatch(r))return true;const t=norm([r.src,r.m,r.cmp,r.tags,r.nm,r.ref].join(' '));return KEL_MARKS.some(k=>t.includes(k));}
 function lossKey(r){const b=baseStage(r.st);if(b==='закрыто и не реализовано'){const rs=reasonOf(r);return {k:'ЗНР: '+(rs?rs.charAt(0).toUpperCase()+rs.slice(1):'без причины'),t:QR.has(rs)?'q':JUNK.has(rs)?'x':''};}if(SS.has(b))return {k:r.st.trim(),t:'s'};return {k:r.st.trim(),t:QS.has(b)?'q':''};}
 
 /* ===== форматирование ===== */
@@ -412,7 +416,7 @@ async function loadWindow(win,force){
     applyApi(d,win);
     if(!FBADS){try{setLoading(true,'Лиды загружены. Загружаю объявления Facebook для раздела креативов…');applyAds(await apiGet({action:'ads',from:win[0],to:win[1],force:force?1:0}));}catch(e){FBADS=null;FBADS_ERR=String(e&&e.message||e);}}
     try{const c=await apiGet({action:'calendar',from:win[0],to:win[1]},60000);CAL=(c&&c.days&&!c.error&&Object.keys(c.days).length)?c:null;}catch(e){CAL=null;}
-    try{const kz=await apiGet({action:'kelesu',from:win[0],to:win[1]},60000);if(kz&&!kz.error&&Array.isArray(kz.items)){KELAPI=kz;KELAPI_ERR='';}else{KELAPI=null;KELAPI_ERR=kz&&kz.error?String(kz.error):'нет ответа';}}catch(e){KELAPI=null;KELAPI_ERR=String(e&&e.message||e);}
+    try{setLoading(true,'Загружаю рассылки Келесу и сверяю получателей с лидами по телефону…');let kz=await apiGet({action:'kelesu',from:win[0],to:win[1],force:force?1:0},330000);if(typeof kz==='string')kz=JSON.parse(kz);if(kz&&!kz.error&&Array.isArray(kz.items)){KELAPI=kz;KELAPI_ERR='';}else{KELAPI=null;KELAPI_ERR=kz&&kz.error?String(kz.error):'нет ответа';}}catch(e){KELAPI=null;KELAPI_ERR=String(e&&e.message||e);}
     document.getElementById('exportMsg').hidden=true;
   }catch(err){showMsg('Не удалось загрузить данные из API: '+err.message+'. Можно загрузить выгрузки вручную кнопками «amoCRM файл» и «FB файл».','err');}
   finally{setLoading(false);}
@@ -563,7 +567,7 @@ function compute(){
   const rowFor=(d,c)=>{if(rowKeyOf[d+'|'+c])return rowKeyOf[d+'|'+c];const rs=cityRows.filter(x=>x.dir===d).map(x=>x.key);
     return rs.find(k=>k.endsWith('|все города'))||rs.find(k=>k.endsWith('|другие города / без города'))||rs[0]||'';};
   const pays=[];
-  const kname=r=>String(r.cmp||'').trim()||String(r.m||'').trim()||'(без метки)';
+  const kname=r=>{const m=kelMatch(r);return m?'#'+m[0]:'по метке: '+(String(r.cmp||'').trim()||String(r.m||'').trim()||'(без метки)');};
   const kel={rows:{},T:{leads:0,qual:0,sale:0,rev:0,pay:0,payN:0}};
   const kelRow=nm=>kel.rows[nm]||(kel.rows[nm]={name:nm,leads:0,qual:0,sale:0,rev:0,pay:0,payN:0});
   if(PAYS){for(const k in PAYS){const p=PAYS[k];const dt=String(p.date||'').slice(0,10);if(!dt||dt<from||dt>to)continue;
@@ -647,32 +651,56 @@ document.getElementById('kpiDir').addEventListener('click',e=>{const b=e.target.
 
 /* ----- рассылки Келесу ----- */
 const kelCostKey=A=>'ia_kelcost_'+A.from+'_'+A.to;
-function kelApiFor(A){if(!KELAPI||!Array.isArray(KELAPI.items))return null;const by={},T={sent:0,delivered:0,cost:0};
-  for(const it of KELAPI.items){const d=String(it.date||'').slice(0,10);if(d&&(d<A.from||d>A.to))continue;const k=norm(it.name);const o=by[k]||(by[k]={name:String(it.name||''),sent:0,delivered:0,cost:0});
-    for(const f of ['sent','delivered','cost']){const v=+it[f]||0;o[f]+=v;T[f]+=v;}}
-  return {by,T};}
+let KELSEL='all';
+const fDM=d=>d?d.slice(8,10)+'.'+d.slice(5,7):'';
+function kelRowsFor(A){
+  const api=KELAPI&&Array.isArray(KELAPI.items)?KELAPI:null,z={leads:0,qual:0,sale:0,rev:0,pay:0,payN:0},rows=[],used={};
+  if(api)for(const it of api.items){const k='#'+it.id,o=A.kel.rows[k],inPer=it.date>=A.from&&it.date<=A.to;if(!inPer&&!o)continue;used[k]=1;
+    rows.push({key:k,name:it.name,tpl:it.template,date:it.date,it,inPer,o:Object.assign({},z,o||{})});}
+  for(const k in A.kel.rows)if(!used[k])rows.push({key:k,name:k[0]==='#'?'Рассылка '+k:k,tpl:'',date:'',it:null,inPer:false,o:Object.assign({},z,A.kel.rows[k])});
+  rows.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.o.leads-a.o.leads);
+  return {api,rows};
+}
 function renderKel(A){
   document.getElementById('kelMarks').textContent=KEL_MARKS.join(', ');
-  const el=document.getElementById('tKel'),inp=document.getElementById('kelCost'),api=kelApiFor(A);
+  const R=kelRowsFor(A),api=R.api,rows=R.rows;
+  if(api&&api.window)document.getElementById('kelWin').textContent=api.window;
+  const el=document.getElementById('tKel'),inp=document.getElementById('kelCost');
   const man=store.get(kelCostKey(A),null);if(document.activeElement!==inp)inp.value=man==null?'':man;
-  const apiCost=api&&api.T.cost>0;inp.disabled=!!apiCost;
-  document.getElementById('kelApiNote').textContent=api?'Отправлено, доставлено и стоимость — из API Келесу.'+(apiCost?'':' Стоимость API не вернул — её можно вписать вручную.'):'API Келесу не подключено'+(KELAPI_ERR&&WIN?' ('+KELAPI_ERR+')':'')+': отправки и доставки появятся после подключения. Стоимость пока можно вписать вручную — она хранится в этом браузере для выбранного периода.';
-  const names={};for(const k in A.kel.rows)names[norm(k)]=A.kel.rows[k].name;if(api)for(const k in api.by)if(!names[k])names[k]=api.by[k].name;
-  const keys=Object.keys(names);
-  if(!keys.length){el.innerHTML='<div class="empty">'+(WIN||MANUAL?'За период нет лидов с рассылок Келесу':'Данные ещё не загружены')+'</div>';A.kelOut=null;return;}
-  const z={leads:0,qual:0,sale:0,rev:0,pay:0,payN:0};
-  const rows=keys.map(k=>{const o=Object.assign({},z,A.kel.rows[names[k]]||{}),s=api&&api.by[k]||{sent:0,delivered:0,cost:0};return {name:names[k],o,s};}).sort((a,b)=>b.o.leads-a.o.leads||b.s.sent-a.s.sent);
-  const tS=api?api.T:{sent:0,delivered:0,cost:0},tCost=apiCost?api.T.cost:(+man||0);
-  const tO=Object.assign({},z,A.kel.T);
-  const cell=(o,s,cost,cls,name)=>{const qp=o.leads?o.qual/o.leads*100:null,conv=s.delivered?o.leads/s.delivered*100:null;
-    const romi=cost>0?(o.rev-cost)/cost*100:null,romiAll=cost>0&&A.hasPays?(o.pay-cost)/cost*100:null;
-    return '<tr'+(cls?' class="'+cls+'"':'')+'><td class="l">'+esc(name)+'</td><td>'+(api?fI(s.sent):dash)+'</td><td>'+(api?fI(s.delivered):dash)+'</td><td>'+fI(o.leads)+'</td><td>'+(conv==null?dash:fP(conv))+'</td><td>'+fI(o.qual)+'</td><td>'+(qp==null?dash:fP(qp))+'</td><td>'+fI(o.sale)+'</td><td>'+(o.rev?fI(o.rev):dash)+'</td><td>'+(A.hasPays?(o.pay?fI(o.pay)+' <small class="mut">'+o.payN+' шт</small>':dash):dash)+'</td><td>'+(cost>0?fK(cost):dash)+'</td><td class="cpl">'+(cost>0&&o.leads?fK(cost/o.leads):dash)+'</td><td>'+romiPill(romi)+'</td><td>'+romiPill(romiAll)+'</td></tr>';};
-  let h='<table><thead><tr><th class="l">Рассылка</th><th>Отправлено</th><th>Доставлено</th><th>Лиды</th><th>Лид / доставл.</th><th>Квал</th><th>%квал</th><th>Продажи</th><th>Выручка ₸</th><th>Оплаты ₸</th><th>Стоимость</th><th class="cpl">CPL</th><th>ROMI</th><th>ROMI общ.</th></tr></thead><tbody>';
-  for(const x of rows)h+=cell(x.o,x.s,apiCost?x.s.cost:0,'',x.name);
-  h+=cell(tO,tS,tCost,'total','Итого рассылки');
-  el.innerHTML=h+'</tbody></table>';
-  A.kelOut={rows,tO,tS,tCost,api:!!api};
+  const priced=!!(api&&api.price>0);inp.disabled=priced;
+  document.getElementById('kelApiNote').textContent=api?('Доставлено и прочитано — из API Келесу'+(priced?', стоимость = доставлено × '+api.price+' ₸':'; стоимость впишите вручную')+'.'+(api.partial?' ⚠ Получатели части рассылок скачаны не полностью — нажмите «Обновить данные» или запустите kelesuWarm в Apps Script.':''))
+    :'API Келесу не ответило'+(KELAPI_ERR&&WIN?' ('+KELAPI_ERR+')':'')+': лиды определены по меткам, данных об отправке нет.';
+  const S=(arr)=>{const t={total:0,delivered:0,read:0,cost:0,leads:0,qual:0,sale:0,rev:0,pay:0,payN:0};for(const x of arr){if(x.it&&x.inPer)for(const f of ['total','delivered','read','cost'])t[f]+=+x.it[f]||0;for(const f in x.o)t[f]+=x.o[f];}return t;};
+  const T=S(rows),tCost=priced?T.cost:(+man||0);
+  const pct=(a,b)=>b?fP(a/b*100):'—';
+  const kpi=document.getElementById('kelKpis'),fun=document.getElementById('kelFunnel'),sel=document.getElementById('kelSel');
+  if(!rows.length){el.innerHTML='<div class="empty">'+(WIN||MANUAL?'За период нет рассылок и ответов на них':'Данные ещё не загружены')+'</div>';kpi.innerHTML='';fun.innerHTML='';sel.innerHTML='';A.kelOut=null;return;}
+  const romiAll=tCost>0&&A.hasPays?(T.pay-tCost)/tCost*100:null;
+  const tiles=[['Доставлено',api?fI(T.delivered):'—',api?pct(T.delivered,T.total)+' от базы':'нет API',''],['Прочитано',api?fI(T.read):'—',api?pct(T.read,T.delivered)+' доставленных':'',''],
+    ['Ответили (лиды)',fI(T.leads),api?pct(T.leads,T.read)+' прочитавших':'','hi'],['Квалы',fI(T.qual),pct(T.qual,T.leads)+' ответивших',''],
+    [A.hasPays?'Оплаты':'Продажи',A.hasPays?fI(T.payN):fI(T.sale),A.hasPays?fM(T.pay)+' млн ₸':fM(T.rev)+' млн ₸','good'],
+    [A.hasPays?'ROMI общ.':'ROMI',(A.hasPays?romiAll:(tCost>0?(T.rev-tCost)/tCost*100:null))==null?'—':fP(A.hasPays?romiAll:(T.rev-tCost)/tCost*100,0),tCost>0&&T.leads?'CPL '+fK(tCost/T.leads):'нужна стоимость','']];
+  kpi.innerHTML=tiles.map(t=>'<div class="kpi'+(t[3]==='hi'?' hi':'')+'"><div class="k">'+t[0]+'</div><div class="v'+(t[3]==='good'?' good':'')+'">'+t[1]+'</div><div class="d">'+t[2]+'</div></div>').join('');
+  const withIt=rows.filter(x=>x.it);
+  if(KELSEL!=='all'&&!withIt.some(x=>x.key===KELSEL))KELSEL='all';
+  sel.innerHTML='<option value="all">Все рассылки периода</option>'+withIt.map(x=>'<option value="'+esc(x.key)+'"'+(KELSEL===x.key?' selected':'')+'>'+esc(fDM(x.date)+' · '+x.name)+'</option>').join('');
+  sel.disabled=!withIt.length;
+  const F=KELSEL==='all'?S(withIt.filter(x=>x.inPer)):S(withIt.filter(x=>x.key===KELSEL));
+  const steps=[['База',F.total,''],['Доставлено',F.delivered,''],['Прочитано',F.read,''],['Ответили',F.leads,'a'],['Квал',F.qual,'q'],[A.hasPays?'Оплата':'Продажа',A.hasPays?F.payN:F.sale,'s']];
+  const top=Math.max(1,...steps.map(x=>x[1]));
+  fun.innerHTML=withIt.length?steps.map((x,i)=>'<div class="brow"><span class="lbl">'+x[0]+'</span><div class="track"><div class="fill '+x[2]+'" style="width:'+Math.max(x[1]?0.6:0,x[1]/top*100).toFixed(1)+'%"></div></div><span class="n">'+fI(x[1])+(i?' <small class="mut">'+pct(x[1],steps[i-1][1])+'</small>':'')+'</span></div>').join('')
+    :'<div class="empty">Воронка доступна, когда подключено API Келесу</div>';
+  const cell=(name,date,it,o,cost,cls)=>{const del=it?it.delivered:0,rd=it?it.read:0,romi=cost>0?(o.rev-cost)/cost*100:null,romiA=cost>0&&A.hasPays?(o.pay-cost)/cost*100:null;
+    return '<tr'+(cls?' class="'+cls+'"':'')+'><td class="l">'+name+'</td><td>'+(date?fDM(date):dash)+'</td><td>'+(it||cls?fI(del):dash)+'</td><td>'+(it||cls?fI(rd):dash)+'</td><td><b>'+fI(o.leads)+'</b></td><td>'+(rd?fP(o.leads/rd*100):dash)+'</td><td>'+fI(o.qual)+'</td><td>'+(o.leads?fP(o.qual/o.leads*100):dash)+'</td><td>'+fI(o.sale)+'</td><td>'+(o.rev?fI(o.rev):dash)+'</td><td>'+(A.hasPays&&o.pay?fI(o.pay)+' <small class="mut">'+o.payN+' шт</small>':dash)+'</td><td>'+(cost>0?fK(cost):dash)+'</td><td class="cpl">'+(cost>0&&o.leads?fK(cost/o.leads):dash)+'</td><td>'+romiPill(romi)+'</td><td>'+romiPill(romiA)+'</td></tr>';};
+  let h='<table><thead><tr><th class="l">Рассылка</th><th>Отправка</th><th>Доставлено</th><th>Прочитано</th><th>Ответили</th><th>% ответа</th><th>Квал</th><th>%квал</th><th>Продажи</th><th>Выручка ₸</th><th>Оплаты ₸</th><th>Стоимость</th><th class="cpl">CPL</th><th>ROMI</th><th>ROMI общ.</th></tr></thead><tbody>';
+  for(const x of rows){const nm=esc(x.name)+(x.tpl?' <small class="mut">'+esc(x.tpl)+'</small>':'')+(x.it&&!x.inPer?' <small class="mut">отправлена до периода</small>':'')+(x.it&&x.it.rcpFull===false?' <small class="mut">⚠ не все получатели</small>':'');
+    h+=cell(nm,x.date,x.it&&x.inPer?x.it:null,x.o,priced&&x.it&&x.inPer?x.it.cost:0,'');}
+  const Tt={leads:T.leads,qual:T.qual,sale:T.sale,rev:T.rev,pay:T.pay,payN:T.payN};
+  h+=cell('Итого рассылки','',{delivered:T.delivered,read:T.read},Tt,tCost,'total');
+  el.innerHTML=h+'</tbody></table><p class="note" style="padding:8px 12px;margin:0">Доставлено и прочитано — только по рассылкам, отправленным в выбранном периоде. Ответы считаются по дате создания сделки; ответы на рассылку, отправленную до начала периода, попадают в её строку.</p>';
+  A.kelOut={rows,T,tCost,api:!!api};
 }
+document.getElementById('kelSel').addEventListener('change',e=>{KELSEL=e.target.value;if(LAST)renderKel(LAST);});
 document.getElementById('kelCost').addEventListener('change',e=>{if(!LAST)return;const v=parseFloat(e.target.value);store.set(kelCostKey(LAST),v>0?v:null);renderKel(LAST);});
 
 function renderDir(A){
@@ -1102,10 +1130,11 @@ function buildWorkbook(){
     ['Выручка ₸',Math.round(T.rev),Math.round(P.rev)],['Расход $',r2(P.spend),r2(P.spend)],['CPQL $',r2(T.spend?T.spend/T.qual:null),r2(P.cpql)],['CAC $',r2(T.spend&&T.sale?T.spend/T.sale:null),r2(P.cac)],['ROMI %',r1(T.romi),r1(P.romi)],
     ['План 1, лиды за период',Math.round(A.cityRows.reduce((s,x)=>s+x.p1,0))],['План 2, лиды за период',Math.round(A.cityRows.reduce((s,x)=>s+x.p2,0))],['Лиды рассылок Келесу (исключены)',A.KR.length],[],
     ['Источники: лиды — '+srcAmo+'; расход — '+srcFb+'. ROMI «Всего» включает выручку неплатных каналов, окупаемость рекламы — колонка «Платный трафик». Лиды рассылок Келесу — на листе «Келесу».']],[34,16,16]);
-  if(A.kelOut){const ko=A.kelOut,kl=[['Рассылки Келесу · '+per],['Рассылка','Отправлено','Доставлено','Лиды','Квалы','Продажи','Выручка ₸','Оплаты ₸','Оплат, шт','Стоимость ₸','CPL ₸','ROMI %','ROMI общ. %']];
-    const krow=(name,o,s,cost)=>[name,ko.api?s.sent:'',ko.api?s.delivered:'',o.leads,o.qual,o.sale,Math.round(o.rev),Math.round(o.pay),o.payN,cost>0?Math.round(cost):'',cost>0&&o.leads?Math.round(cost/o.leads):'',cost>0?r1((o.rev-cost)/cost*100):'',cost>0&&A.hasPays?r1((o.pay-cost)/cost*100):''];
-    for(const x of ko.rows)kl.push(krow(x.name,x.o,x.s,ko.api?x.s.cost:0));kl.push(krow('Итого',ko.tO,ko.tS,ko.tCost));
-    add('Келесу',kl,[30,11,11,8,8,8,12,12,9,11,9,9,10]);}
+  if(A.kelOut){const ko=A.kelOut,kl=[['Рассылки Келесу · '+per],['Рассылка','Шаблон','Отправка','База','Доставлено','Прочитано','Ответили (лиды)','% ответа от прочитавших','Квалы','Продажи','Выручка ₸','Оплаты ₸','Оплат, шт','Стоимость ₸','CPL ₸','ROMI %','ROMI общ. %']];
+    const krow=(x,it,o,cost)=>[x.name,x.tpl||'',x.date||'',it?it.total:'',it?it.delivered:'',it?it.read:'',o.leads,it&&it.read?r1(o.leads/it.read*100):'',o.qual,o.sale,Math.round(o.rev),Math.round(o.pay),o.payN,cost>0?Math.round(cost):'',cost>0&&o.leads?Math.round(cost/o.leads):'',cost>0?r1((o.rev-cost)/cost*100):'',cost>0&&A.hasPays?r1((o.pay-cost)/cost*100):''];
+    for(const x of ko.rows)kl.push(krow(x,x.it&&x.inPer?x.it:null,x.o,x.it&&x.inPer?+x.it.cost||0:0));
+    kl.push(krow({name:'Итого'},{total:ko.T.total,delivered:ko.T.delivered,read:ko.T.read},ko.T,ko.tCost));
+    add('Келесу',kl,[30,22,10,9,11,10,12,12,8,8,12,12,9,11,9,9,10]);}
   const dh=['Направление','Тип','Расход $','Лиды','CPL $','Конв. сайта %','Квал','%квал','CPQL $','Продажи','%кв→прод','CAC $','Выручка ₸','ROMI %'];
   const drow=(name,type,M)=>[name,type,r2(M.spend),M.leads,r2(M.cpl),r1(M.conv),M.qual,r1(M.qpct),r2(M.cpql),M.sale,r1(M.spct),r2(M.cac),Math.round(M.rev),r1(M.romi)];
   const d=[['По рекламному направлению · '+per],dh];for(const x of A.dirs)d.push(drow(x.k,x.paid?'Платный':'Без расхода',x.M));
