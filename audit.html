@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Invictus · аудит креативов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --surface2:#f8fafb; --ink:#161a20; --muted:#5f6a79;
+  --border:#e2e7ed; --border2:#eef1f5;
+  --accent:#e35d2b; --accent-soft:#fdeee7;
+  --good:#1a8f55; --good-soft:#e5f4ec; --warn:#b97510; --warn-soft:#fbf1df; --bad:#c9443a; --bad-soft:#fbeae8;
+  --plan:#2f6fd0;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1116; --surface:#161b22; --surface2:#1b2129; --ink:#e7ebf0; --muted:#97a3b3;
+  --border:#29303a; --border2:#20272f; --accent:#ff7c47; --accent-soft:#2c1b12;
+  --good:#3bc47f; --good-soft:#12261c; --warn:#e0a13c; --warn-soft:#2a210f; --bad:#f0685a; --bad-soft:#2c1613; --plan:#6ea4ff; color-scheme:dark}}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:max(20px,env(safe-area-inset-left));padding-block:max(20px,env(safe-area-inset-top)) 64px;display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:12px;align-items:center}
+.mark{width:42px;height:42px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:700 18px var(--f-display);flex:none}
+h1{font:700 28px/1.1 var(--f-display);margin:0}
+h2{font:700 21px/1.2 var(--f-display);margin:0}
+h3{font:600 15px var(--f-body);margin:0 0 8px}
+.sub{color:var(--muted);font-size:13px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font:500 13.5px var(--f-body);cursor:pointer}
+.btn:hover{border-color:var(--accent)} .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff} .btn[disabled]{opacity:.55;cursor:default}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;box-shadow:0 4px 18px rgba(20,26,32,.06)}
+.fld{display:flex;flex-direction:column;gap:3px;min-width:0}
+.fld label,.fld .lb{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+input,select,textarea{padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--ink);font:500 14px var(--f-body)}
+input[type=number]{width:90px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:6px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--ink);font:500 12.5px var(--f-body);cursor:pointer}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.msg{font-size:13px;padding:10px 12px;border-radius:9px;background:var(--surface2);border:1px solid var(--border)}
+.msg.err{background:var(--bad-soft);border-color:transparent;color:var(--bad)} .msg.ok{background:var(--good-soft);border-color:transparent;color:var(--good)}
+.msg a{color:inherit;font-weight:600}
+section{display:flex;flex-direction:column;gap:10px;min-width:0}
+.eyebrow{font:600 11.5px var(--f-body);text-transform:uppercase;letter-spacing:.09em;color:var(--accent)}
+.lead{max-width:85ch;color:var(--muted);margin:0;font-size:14px}
+.note{font-size:12.5px;color:var(--muted);max-width:100ch;margin:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.kpi .v{white-space:nowrap;font:700 23px/1.15 var(--f-display);font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12.5px;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;min-width:0}
+.ins{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.tscroll{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border2)}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--surface2)}
+th.l,td.l{text-align:left} td.w{white-space:normal;min-width:180px;max-width:300px}
+th[data-s]{cursor:pointer} th[data-s]:hover{color:var(--accent)} th.sorted{color:var(--accent)}
+.tscroll table th:first-child,.tscroll table td:first-child{position:sticky;left:0;z-index:1;background:var(--surface);box-shadow:1px 0 0 var(--border2)}
+.tscroll table th:first-child{background:var(--surface2);z-index:2}
+td a,.lk a{color:var(--accent);text-decoration:none} td a:hover,.lk a:hover{text-decoration:underline}
+.up{color:var(--good);font-weight:600} .dn{color:var(--bad);font-weight:600} .mut{color:var(--muted)}
+.pill{display:inline-block;padding:1px 8px;border-radius:20px;font-weight:600;font-size:12px;white-space:nowrap}
+.pill.a{background:var(--good-soft);color:var(--good)} .pill.b{background:var(--warn-soft);color:var(--warn)} .pill.d{background:var(--bad-soft);color:var(--bad)} .pill.n{background:var(--surface2);color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card .top{display:grid;grid-template-columns:96px 1fr;gap:12px}
+.card img{width:96px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:var(--surface2);display:block}
+.card .ph{width:96px;aspect-ratio:9/16;border-radius:8px;background:var(--surface2);display:grid;place-items:center;color:var(--muted);font-size:11px;text-align:center}
+.card h3{margin:0;font:700 17px/1.2 var(--f-display);word-break:break-word}
+.card .eb{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.card .hk{font-size:13.5px;margin:0}
+.lk{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px}
+.mk{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mk div{background:var(--surface2);border-radius:8px;padding:5px 7px}
+.mk span{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.mk b{font:700 16px var(--f-display)}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:11px;border:1px solid var(--border);background:var(--surface2);border-radius:6px;padding:1px 7px}
+dl{display:grid;grid-template-columns:110px 1fr;gap:3px 10px;margin:0;font-size:12.5px} dt{color:var(--muted)} dd{margin:0}
+.heat td{text-align:center;border:2px solid var(--surface);border-radius:6px;min-width:86px}
+.heat th.l{text-align:left}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.split{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:12px} @media (max-width:820px){.split{grid-template-columns:1fr}}
+.chart svg{width:100%;height:auto;display:block} .chart text{font-family:var(--f-body);font-size:11px;fill:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+dialog{border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--ink);padding:18px;width:min(560px,94vw)}
+dialog::backdrop{background:rgba(10,14,20,.45)}
+.frm{display:grid;grid-template-columns:1fr 1fr;gap:10px} .frm .full{grid-column:1/-1} .frm .fld input,.frm .fld select,.frm .fld textarea{width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:12px}
+.flag{font-size:11px;font-weight:600;color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav id="ianav"></nav>
+<header>
+  <div class="brand"><div class="mark">IA</div>
+    <div><h1>Аудит креативов</h1><div class="sub">Hook и hold rate из Meta · кто пришёл по квизу amoCRM · окупаемость по оплатам</div></div></div>
+  <div class="chips">
+    <button class="btn" id="bCsv" disabled>⬇ CSV</button>
+    <button class="btn primary" id="bLoad">⬇ Загрузить</button>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="fld"><label for="dFrom">С</label><input type="date" id="dFrom"></div>
+  <div class="fld"><label for="dTo">По</label><input type="date" id="dTo"></div>
+  <div class="fld"><span class="lb">Быстро</span><div class="chips" id="presets"></div></div>
+  <div class="fld"><span class="lb">Направление</span><div class="chips" id="dirs"></div></div>
+  <div class="fld"><label for="minSp">Расход от, $</label><input type="number" id="minSp" min="0" step="10"></div>
+  <div class="fld"><label for="rate">Курс ₸/$</label><input type="number" id="rate" min="1" step="1"></div>
+  <div class="fld"><span class="lb">Креативы</span><div class="chips" id="kind"></div></div>
+</div>
+<div id="msg" class="msg" hidden></div>
+
+<div id="app"><div class="empty">Выберите период и нажмите «Загрузить». Запрос за год в первый раз собирается 2–4 минуты, дальше открывается из кэша.</div></div>
+
+<dialog id="dlg">
+  <form method="dialog" id="frm">
+    <h2 id="dlgT" style="margin-bottom:4px">Разметка</h2>
+    <p class="note" style="margin:0 0 12px">Разметка общая для всех, кто открывает отчёт. Посмотрите первые 3 секунды ролика и заполните поля.</p>
+    <div class="frm">
+      <div class="fld full"><label for="fTxt">Хук — что звучит или написано в первые 3 секунды</label><textarea id="fTxt" rows="2"></textarea></div>
+      <div class="fld"><label for="fHt">Приём хука</label><select id="fHt"></select></div>
+      <div class="fld"><label for="fSeg">Сегмент по содержанию</label><select id="fSeg"></select></div>
+      <div class="fld"><label for="fFmt">Формат</label><select id="fFmt"></select></div>
+      <div class="fld"><label for="fHero">Герой</label><input id="fHero" placeholder="Тренер Ж, выпускник М…"></div>
+      <div class="fld full"><label for="fFf">Первый кадр</label><input id="fFf" placeholder="Что видно на 0 секунде, есть ли текст"></div>
+      <div class="fld"><label for="fMean">Смысл</label><input id="fMean" placeholder="Хобби → профессия…"></div>
+      <div class="fld"><label for="fOffer">Оффер</label><input id="fOffer" placeholder="4 месяца, доход…"></div>
+    </div>
+    <div class="row">
+      <button type="button" class="btn" id="dDel">Удалить разметку</button>
+      <button type="button" class="btn" id="dCancel">Отмена</button>
+      <button type="button" class="btn primary" id="dSave">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+</div>
+
+<script src="nav.js"></script>
+<script>
+/* Тот же бэкенд, что у report.html (Code.gs + audit.gs) */
+const API_URL = "https://script.google.com/macros/s/AKfycbxcrFFl2-_rubJqeIMFTO-GBDQv_mQ1CDdF4mKsPIKZ0_Zqag6Nq3nf74r3F4Bm-0-y/exec";
+
+const HT_LIST=['Обращение к сегменту','Боль / страх','Боль / усталость','Боль / мечта','Возражение','Развенчание мифа','Выгоды профессии','История героя','Спор / вызов','Сценка','Как-то / инструкция','Обещание-инструкция','Вопрос-желание','Вопрос-желание + «досмотри»','Вопрос-интрига','Факт / «а ты знал»','Факт / определение','Разоблачение / «правда»','Оффер в первом кадре','Нестандартный кадр'];
+const SEG_LIST=['Уже тренируются','Ходят на групповые','Бывшие спортсмены','Смена профессии','Без спортивного опыта','Мотив «вдохновлять»','Широкий / не адресован'];
+const FMT_LIST=['Говорящая голова + крупный текст','Говорящая голова без крупного текста','Сценка','Селфи / кружок','Моушн-шаблон','Статика'];
+const DIRS=['all','ТЗ','ГП','ТЗ_каз','Bust_plus'];
+
+/* ===== утилиты ===== */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fP=(v,d=1)=>v==null||!isFinite(v)?'—':v.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d})+'%';
+const fU=(v,d=1)=>v==null||!isFinite(v)?'—':'$'+v.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fI=v=>Math.round(v||0).toLocaleString('ru-RU');
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+const todayISO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+const ddmm=iso=>iso?iso.slice(8,10)+'.'+iso.slice(5,7)+'.'+iso.slice(0,4):'';
+const norm=s=>String(s==null?'':s).replace(/\s+/g,' ').trim().toLowerCase();
+
+function apiGet(params,timeoutMs){return new Promise((resolve,reject)=>{
+  const cb='__aud'+(apiGet.n=(apiGet.n||0)+1)+'_'+Date.now();const s=document.createElement('script');let done=false;
+  const to=setTimeout(()=>{if(done)return;done=true;cleanup();reject(new Error('API не ответил вовремя'));},timeoutMs||60000);
+  function cleanup(){try{delete window[cb];}catch(e){window[cb]=undefined;}if(s.parentNode)s.parentNode.removeChild(s);clearTimeout(to);}
+  window[cb]=d=>{if(done)return;done=true;cleanup();if(typeof d==='string'){try{d=JSON.parse(d);}catch(e){}}resolve(d);};
+  const q=Object.keys(params).map(k=>k+'='+encodeURIComponent(params[k])).join('&');
+  s.src=API_URL+'?'+q+'&callback='+cb;
+  s.onerror=()=>{if(done)return;done=true;cleanup();reject(new Error('не удалось подключиться к API. <a href="'+API_URL+'?'+q+'" target="_blank" rel="noopener">Открыть запрос в новой вкладке</a>'));};
+  document.body.appendChild(s);});}
+
+/* ===== состояние ===== */
+let ST={from:store.get('aud_from',addDays(todayISO(),-90)),to:store.get('aud_to',todayISO()),dir:store.get('aud_dir','all'),
+  minSp:store.get('aud_min',50),rate:store.get('ia_rate',465),kind:store.get('aud_kind','video'),sort:store.get('aud_sort','sp'),sortDir:-1,show:30};
+let DATA=null, TAGS={}, ROWS=[], BASE={}, LOADING=false;
+
+function showMsg(t,cls){const m=$('msg');m.hidden=!t;m.className='msg'+(cls?' '+cls:'');m.innerHTML=t||'';}
+
+/* ===== расчёт ===== */
+function group(d){return d==='ГП'?'ГП':'ТЗ';}
+function noSeg(r){return r.dir==='Bust_plus'||r.ans<20;}
+function derive(c){
+  const k=DATA.cur==='kzt'?1/ST.rate:1, sp=c.sp*k;
+  let dir='',best=0;for(const d in c.dirs){if(c.dirs[d]>best){best=c.dirs[d];dir=d;}}
+  const t=TAGS[c.k]||null, video=(c.th>0||c.v3>0)&&(!t||t.fmt!=='Статика');
+  const cpl=c.ld?sp/c.ld:null, corePct=c.ans?c.core/c.ans*100:null;
+  return {...c,sp,dir:dir||'—',g:group(dir),t,video,
+    hook:video&&c.im?c.v3/c.im*100:null, hold:video&&c.v3?c.th/c.v3*100:null,
+    ctr:c.im?c.cl/c.im*100:null, cpl, qpct:c.ld?c.q/c.ld*100:null,
+    romi:sp>0?((c.rev/ST.rate)-sp)/sp*100:null,
+    corePct, sportPct:c.ans?c.sport/c.ans*100:null, begPct:c.ans?c.beg/c.ans*100:null,
+    cpcore:(cpl&&c.core)?cpl/(c.core/c.ans):null,
+    r25:c.v3?c.p25/c.v3*100:null,r50:c.v3?c.p50/c.v3*100:null,r75:c.v3?c.p75/c.v3*100:null,r100:c.v3?c.p100/c.v3*100:null};
+}
+function baselines(rows){
+  const B={};
+  for(const g of ['ТЗ','ГП']){
+    const R=rows.filter(r=>r.g===g), V=R.filter(r=>r.video);
+    const s=(a,f)=>a.reduce((x,r)=>x+(r[f]||0),0);
+    const im=s(V,'im'),v3=s(V,'v3'),th=s(V,'th'),sp=s(R,'sp'),ld=s(R,'ld'),ans=s(R.filter(r=>r.dir!=='Bust_plus'),'ans');
+    const core=s(R.filter(r=>r.dir!=='Bust_plus'),'core'),sport=s(R.filter(r=>r.dir!=='Bust_plus'),'sport'),beg=s(R.filter(r=>r.dir!=='Bust_plus'),'beg'),rev=s(R,'rev');
+    B[g]={n:R.length,hook:im?v3/im*100:null,hold:v3?th/v3*100:null,core:ans?core/ans*100:null,sport:ans?sport/ans*100:null,beg:ans?beg/ans*100:null,
+      cpl:ld?sp/ld:null,cpcore:(ld&&core)?(sp/ld)/(core/ans):null,romi:sp?((rev/ST.rate)-sp)/sp*100:null,sp,ld};
+  }
+  return B;
+}
+function verdict(r){
+  const b=BASE[r.g]||{};const ns=noSeg(r);
+  if(!r.video)return ['n','Статика','hook и hold считаются только для видео'];
+  if(r.ld<10)return ['n','Мало данных','меньше 10 лидов — вывод рано делать'];
+  const hookOk=r.hook!=null&&b.hook!=null&&r.hook>=b.hook*0.95, holdOk=r.hold!=null&&b.hold!=null&&r.hold>=b.hold*0.95;
+  const cd=ns||b.core==null?0:r.corePct-b.core;
+  if(!ns&&b.sport&&r.sportPct>=2.5*b.sport&&r.romi<150)return ['d','Не масштабировать','приводит спортсменов ('+fP(r.sportPct,0)+' при '+fP(b.sport,0)+' в среднем), но они почти не покупают: ROMI '+fP(r.romi,0)];
+  if(!ns&&r.ld>=30&&cd<=-8&&r.romi<300)return ['d','Не масштабировать','мимо ядра: '+fP(r.corePct,0)+' тренируются от года при '+fP(b.core,0)+' в среднем'];
+  if(r.ld>=20&&r.romi!=null&&r.romi<200)return ['d','Не масштабировать','окупаемость низкая: ROMI '+fP(r.romi,0)+' при '+r.s+' продажах'];
+  if(hookOk&&holdOk&&cd>=0&&r.romi>=300)return ['a','Масштабировать','цепляет и удерживает выше среднего и приводит ядро: снять 3–5 вариаций того же хука'];
+  if(hookOk&&holdOk&&cd>=0)return ['b','Держать','смотрят выше среднего, ядро в норме, но ROMI '+fP(r.romi,0)+' — ниже 300%'];
+  if(hookOk&&holdOk)return ['b','Сузить смысл','смотрят хорошо, но ядра меньше среднего: в первые 3 секунды — обращение к тем, кто тренируется'];
+  if(!hookOk&&holdOk)return ['b','Переснять хук','середина удерживает, первые 3 секунды слабее среднего: главный вопрос — в первый кадр крупным текстом'];
+  if(hookOk&&!holdOk)return ['b','Переделать середину','хук работает, после 3 секунд теряем: короче вступление, оффер раньше'];
+  if(r.romi>=400)return ['b','Переснять подачу','смотрят хуже среднего, но окупается (ROMI '+fP(r.romi,0)+'): смысл оставить, переснять первые 3 секунды и темп'];
+  return ['d','Отключить','слабее среднего и по хуку, и по удержанию'];
+}
+function score(r){const b=BASE[r.g]||{};if(!r.video||noSeg(r))return -1;
+  return [r.hook>=b.hook,r.hold>=b.hold,r.corePct>=b.core,r.cpcore!=null&&r.cpcore<=b.cpcore,r.romi>=400].filter(Boolean).length;}
+
+/* ===== отрисовка ===== */
+function cls(v,b,inv,tol){if(v==null||b==null||!isFinite(v))return '';tol=tol==null?0.05:tol;const hi=b*(1+tol),lo=b*(1-tol);
+  if(inv)return v<=lo?'up':v>=hi?'dn':'';return v>=hi?'up':v<=lo?'dn':'';}
+function fbLink(r){return r.vid?'https://www.facebook.com/reel/'+r.vid+'/':(r.link||'');}
+function amLink(r){const act=String(DATA.acc||'').replace('act_','');return 'https://adsmanager.facebook.com/adsmanager/manage/ads?act='+act+'&selected_ad_ids='+r.ids.join(',');}
+function filtered(){return ROWS.filter(r=>(ST.dir==='all'||r.dir===ST.dir)&&r.sp>=ST.minSp&&(ST.kind==='all'||(ST.kind==='video'&&r.video)||(ST.kind==='untag'&&r.video&&!r.t)));}
+
+function render(){
+  if(!DATA){return;}
+  const all=ROWS.filter(r=>ST.dir==='all'||r.dir===ST.dir);
+  BASE=baselines(ROWS.filter(r=>r.sp>=ST.minSp||r.ld>0));
+  ROWS.forEach(r=>{r.v=verdict(r);r.sc=score(r);});
+  const F=filtered();
+  const vidSp=all.filter(r=>r.video).reduce((s,r)=>s+r.sp,0), tagSp=all.filter(r=>r.video&&r.t).reduce((s,r)=>s+r.sp,0);
+  let h='';
+  h+='<section><div class="eyebrow">Период '+ddmm(DATA.from)+' – '+ddmm(DATA.to)+(DATA.updatedAt?' · обновлено '+new Date(DATA.updatedAt).toLocaleString('ru-RU'):'')+'</div>'
+    +'<p class="lead">Креативов с расходом: '+fI(all.length)+' · расход '+fU(all.reduce((s,r)=>s+r.sp,0),0)+' · лидов привязано '+fI(DATA.matched)+' из '+fI(DATA.leads)
+    +'. Видео размечено на '+fP(vidSp?tagSp/vidSp*100:0,0)+' видеорасхода.</p>'+kpis()+'</section>';
+  h+='<section><h2>Главное</h2><div class="panel"><ol class="ins">'+insights(all)+'</ol></div></section>';
+  h+=ideals();
+  h+='<section><h2>Карточки креативов</h2><p class="note">Сортировка — как в таблице ниже. Зелёным и красным — выше и ниже среднего по направлению. «Нужна разметка» — ролик ещё не просмотрен: откройте его и нажмите «✎ Разметка».</p>'
+    +'<div class="cards">'+F.slice().sort(sorter).slice(0,ST.show).map(card).join('')+'</div>'
+    +(F.length>ST.show?'<div><button class="btn" id="bMore">Показать ещё ('+(F.length-ST.show)+')</button></div>':'')+'</section>';
+  h+=table(F);
+  h+='<section><h2>Матрица «приём хука × кто приходит»</h2><p class="note">Только размеченные видео. Зелёным — лучше среднего по направлению; для новичков и цены лида «лучше» — значит меньше.</p>'+matrix()+'</section>';
+  h+=curves();
+  h+=hit();
+  h+='<section><h2>Как считается</h2><ul class="note">'
+    +'<li>Креатив = название объявления (utm_content); метрики суммируются по всем копиям. Hook rate = 3-секундные просмотры (video_view) ÷ показы; hold rate = ThruPlay ÷ 3-сек. просмотры.</li>'
+    +'<li>Сегмент по факту — квиз «как давно занимаешься спортом»: «1+ год» = около года, несколько лет, давно, профессиональный спорт. Сравнение — со средним своего направления (ТЗ и ГП отдельно). У онлайн-курса (Bust_plus) в анкете нет этого вопроса.</li>'
+    +'<li>Лид привязывается к объявлению по utm_term (ID объявления), иначе по utm_content. Продажи — этап «Предоплата / Успешно» или оплата в таблице оплат; ROMI — по оплатам (курс '+ST.rate+' ₸/$).</li>'
+    +'<li>Эталон: hook и hold не ниже среднего, ядро не ниже среднего, лид из ядра не дороже среднего, ROMI от 400%; учитываются ролики с 20+ анкетами.</li></ul></section>';
+  $('app').innerHTML=h;
+  const m=$('bMore');if(m)m.onclick=()=>{ST.show+=30;render();};
+  $('bCsv').disabled=false;
+}
+function kpis(){let h='<div class="kpis">';
+  for(const g of ['ТЗ','ГП']){const b=BASE[g];if(!b||!b.n)continue;
+    h+='<div class="kpi"><span class="k">'+g+' · hook / hold</span><span class="v">'+fP(b.hook)+' / '+fP(b.hold)+'</span><span class="d">средние по видео направления</span></div>'
+     +'<div class="kpi"><span class="k">'+g+' · лиды 1+ год</span><span class="v">'+fP(b.core,0)+'</span><span class="d">спортсмены '+fP(b.sport,0)+' · новички '+fP(b.beg,0)+'</span></div>'
+     +'<div class="kpi"><span class="k">'+g+' · цена лида 1+ год</span><span class="v">'+fU(b.cpcore)+'</span><span class="d">CPL '+fU(b.cpl)+' · ROMI '+fP(b.romi,0)+'</span></div>';}
+  return h+'</div>';}
+function agg(rs){const s=f=>rs.reduce((x,r)=>x+(r[f]||0),0);const V=rs.filter(r=>r.video);const im=V.reduce((x,r)=>x+r.im,0),v3=V.reduce((x,r)=>x+r.v3,0),th=V.reduce((x,r)=>x+r.th,0);
+  const S=rs.filter(r=>r.dir!=='Bust_plus');const ans=S.reduce((x,r)=>x+r.ans,0),core=S.reduce((x,r)=>x+r.core,0),sp=s('sp'),ld=s('ld');
+  return {n:rs.length,sp,hook:im?v3/im*100:null,hold:v3?th/v3*100:null,core:ans?core/ans*100:null,sport:ans?S.reduce((x,r)=>x+r.sport,0)/ans*100:null,
+    beg:ans?S.reduce((x,r)=>x+r.beg,0)/ans*100:null,cpcore:(ld&&core)?(sp/ld)/(core/ans):null,romi:sp?((s('rev')/ST.rate)-sp)/sp*100:null,s:s('s'),ans,
+    r25:v3?V.reduce((x,r)=>x+r.p25,0)/v3*100:null,r50:v3?V.reduce((x,r)=>x+r.p50,0)/v3*100:null,r75:v3?V.reduce((x,r)=>x+r.p75,0)/v3*100:null,r100:v3?V.reduce((x,r)=>x+r.p100,0)/v3*100:null};}
+function insights(all){
+  const out=[];const T=all.filter(r=>r.video&&r.t);
+  for(const g of ['ТЗ','ГП']){const b=BASE[g];if(!b||!b.n)continue;const G=T.filter(r=>r.g===g);if(!G.length)continue;
+    const by={};G.forEach(r=>{(by[r.t.ht]=by[r.t.ht]||[]).push(r);});
+    const A=Object.entries(by).map(([k,v])=>[k,agg(v)]).sort((a,b)=>b[1].sp-a[1].sp);
+    const [k0,a0]=A[0];
+    out.push('<b>'+g+': главный по расходу приём — «'+esc(k0)+'»</b> ('+a0.n+' роликов, '+fU(a0.sp,0)+'): ядро '+fP(a0.core,0)+' при '+fP(b.core,0)+' в среднем, новичков '+fP(a0.beg,0)+', ROMI '+fP(a0.romi,0)+(a0.core!=null&&b.core!=null&&a0.core<b.core-3?' — приводит не тех, кого нужно.':'.'));
+    const res=A.filter(([k,a])=>a.ans>=40&&a.romi!=null&&b.romi!=null&&a.romi>=b.romi*1.4&&a.hook!=null&&a.hook<b.hook*0.95).sort((x,y)=>y[1].romi-x[1].romi)[0];
+    if(res)out.push('<b>'+g+': резерв — «'+esc(res[0])+'».</b> Окупается лучше среднего (ROMI '+fP(res[1].romi,0)+' при '+fP(b.romi,0)+'), но hook '+fP(res[1].hook)+' ниже среднего '+fP(b.hook)+'. Тот же смысл с более сильным первым кадром.');
+    const bestCore=A.filter(([k,a])=>a.ans>=40&&a.core!=null).sort((x,y)=>y[1].core-x[1].core)[0];
+    if(bestCore&&bestCore[0]!==k0)out.push('<b>'+g+': лучше всех ядро приводит «'+esc(bestCore[0])+'»</b> — '+fP(bestCore[1].core,0)+' лидов тренируются от года'+(bestCore[1].hold!=null&&b.hold!=null&&bestCore[1].hold<b.hold*0.95?', но удержание ниже среднего ('+fP(bestCore[1].hold)+'): после хука теряем зрителя.':'.'));
+  }
+  const hi=all.filter(r=>r.video&&r.ld>=20&&!noSeg(r)&&BASE[r.g]&&r.hook>=BASE[r.g].hook*1.8&&r.corePct<BASE[r.g].core-5).sort((a,b)=>b.hook-a.hook)[0];
+  if(hi)out.push('<b>Высокий hook rate не значит нужные люди.</b> '+esc(hi.n)+': hook '+fP(hi.hook)+' при '+fP(BASE[hi.g].hook)+' в среднем, но ядро '+fP(hi.corePct,0)+' и ROMI '+fP(hi.romi,0)+'.');
+  const sp=all.filter(r=>r.video&&r.ld>=20&&!noSeg(r)&&BASE[r.g]&&r.sportPct>=2.5*BASE[r.g].sport&&r.romi<150)[0];
+  if(sp)out.push('<b>Бывшие спортсмены приходят, но не покупают.</b> '+esc(sp.n)+': спортсменов '+fP(sp.sportPct,0)+', ROMI '+fP(sp.romi,0)+'.');
+  const un=all.filter(r=>r.video&&!r.t&&r.sp>=ST.minSp).sort((a,b)=>b.sp-a.sp);const unSp=un.reduce((s,r)=>s+r.sp,0);
+  if(un.length)out.push('<b>Без разметки '+un.length+' видео на '+fU(unSp,0)+'.</b> Крупнейшие: '+un.slice(0,4).map(r=>esc(r.n)).join(', ')+'. Включите фильтр «Без разметки», откройте ролик и разметьте — выводы выше обновятся.');
+  return out.map(x=>'<li>'+x+'</li>').join('')||'<li class="mut">Пока мало данных для выводов.</li>';}
+function ideals(){
+  const R=ROWS.filter(r=>(ST.dir==='all'||r.dir===ST.dir)&&r.sc>=4).sort((a,b)=>b.sc-a.sc||b.romi-a.romi).slice(0,10);
+  if(!R.length)return '';
+  return '<section><h2>Эталоны: на какие креативы ориентироваться</h2><p class="note">Пять условий одновременно: hook и hold не ниже среднего, ядро не ниже среднего, лид из ядра не дороже среднего, ROMI от 400%. Показаны ролики, где выполнено 4 или 5 условий.</p>'
+   +'<div class="tscroll"><table><tr><th class="l">Креатив</th><th>Напр.</th><th class="l">Хук</th><th>Условий</th><th>Hook</th><th>Hold</th><th>1+ год</th><th>Лид 1+ год</th><th>ROMI</th><th>Продаж</th></tr>'
+   +R.map(r=>{const b=BASE[r.g];return '<tr><td class="l"><a href="#k'+encodeURIComponent(r.k)+'">'+esc(r.n)+'</a></td><td>'+esc(r.dir)+'</td><td class="l w">'+esc(r.t?r.t.txt:'нужна разметка')+'</td><td><span class="pill '+(r.sc===5?'a':'b')+'">'+r.sc+' из 5</span></td>'
+     +'<td class="'+cls(r.hook,b.hook)+'">'+fP(r.hook)+'</td><td class="'+cls(r.hold,b.hold)+'">'+fP(r.hold)+'</td><td class="'+cls(r.corePct,b.core,0,.08)+'">'+fP(r.corePct,0)+'</td><td class="'+cls(r.cpcore,b.cpcore,1,.08)+'">'+fU(r.cpcore)+'</td><td>'+fP(r.romi,0)+'</td><td>'+r.s+'</td></tr>';}).join('')
+   +'</table></div></section>';}
+function card(r){const b=BASE[r.g]||{},t=r.t,u=fbLink(r);
+  const img=r.th_url?'<a href="'+esc(u||r.th_url)+'" target="_blank" rel="noopener"><img loading="lazy" src="'+esc(r.th_url)+'" alt=""></a>':'<div class="ph">нет превью</div>';
+  const who=noSeg(r)?'<span class="mut">'+(r.dir==='Bust_plus'?'в анкете онлайн-курса нет вопроса об опыте':'анкет меньше 20 ('+r.ans+') — сегмент не считаем')+'</span>'
+    :'1+ год: <span class="'+cls(r.corePct,b.core,0,.08)+'">'+fP(r.corePct,0)+'</span> (ср. '+fP(b.core,0)+') · спортсмены '+fP(r.sportPct,0)+' · новички '+fP(r.begPct,0);
+  return '<div class="card" id="k'+encodeURIComponent(r.k)+'"><div class="top">'+img+'<div style="display:flex;flex-direction:column;gap:5px;min-width:0">'
+   +'<div class="eb">'+esc(r.dir)+' · '+fU(r.sp,0)+' · '+fI(r.im/1000)+' тыс. показов</div><h3>'+esc(r.n)+'</h3>'
+   +(t&&t.txt?'<p class="hk">'+esc(t.txt)+'</p>':(r.video?'<span class="flag">Нужна разметка</span>':''))
+   +'<div class="lk">'+(u?'<a href="'+esc(u)+'" target="_blank" rel="noopener">▶ Ролик</a>':'')+'<a href="'+esc(amLink(r))+'" target="_blank" rel="noopener">Ads Manager</a><a href="#" data-tag="'+esc(r.k)+'">✎ Разметка</a></div></div></div>'
+   +'<div class="mk"><div><span>Hook</span><b class="'+cls(r.hook,b.hook)+'">'+fP(r.hook)+'</b></div><div><span>Hold</span><b class="'+cls(r.hold,b.hold)+'">'+fP(r.hold)+'</b></div><div><span>CTR</span><b>'+fP(r.ctr,2)+'</b></div><div><span>CPL</span><b class="'+cls(r.cpl,b.cpl,1,.08)+'">'+fU(r.cpl)+'</b></div></div>'
+   +(t?'<div class="tags">'+[['Хук',t.ht],['1-й кадр',t.ff],['',t.fmt],['Герой',t.hero],['Смысл',t.mean],['Оффер',t.offer]].filter(x=>x[1]).map(x=>'<span class="tag">'+(x[0]?x[0]+': ':'')+esc(x[1])+'</span>').join('')+'</div>':'')
+   +'<dl>'+(t?'<dt>Сегмент по содержанию</dt><dd><b>'+esc(t.seg)+'</b></dd>':'')+'<dt>Кто пришёл</dt><dd>'+who+'</dd>'
+   +'<dt>Лиды → продажи</dt><dd>'+fI(r.ld)+' лидов, квал '+fP(r.qpct,0)+', '+r.s+' продаж, ROMI '+fP(r.romi,0)+'</dd>'
+   +'<dt>Вердикт</dt><dd><span class="pill '+r.v[0]+'">'+esc(r.v[1])+'</span> '+esc(r.v[2])+'</dd></dl></div>';}
+const COLS=[['n','Креатив',1],['dir','Напр.',1],['sp','Расход'],['ht','Приём хука',1],['fmt','Формат',1],['seg','Сегмент по содержанию',1],['hook','Hook'],['hold','Hold'],['avg','Ср. просмотр'],['ctr','CTR'],['cpl','CPL'],['ld','Лиды'],['corePct','1+ год'],['sportPct','Спортсм.'],['begPct','Новички'],['cpcore','Лид 1+ год'],['s','Продаж'],['romi','ROMI'],['vv','Вердикт',1]];
+function val(r,k){if(k==='ht'||k==='fmt'||k==='seg')return r.t?r.t[k]:'';if(k==='vv')return r.v[1];return r[k];}
+function sorter(a,b){const k=ST.sort,x=val(a,k),y=val(b,k);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return (typeof x==='string'?x.localeCompare(y,'ru'):x-y)*ST.sortDir;}
+function table(F){const R=F.slice().sort(sorter);
+  return '<section><h2>Сводная таблица</h2><p class="note">Клик по заголовку — сортировка. Подсветка — относительно среднего по своему направлению.</p><div class="tscroll"><table id="tbl"><tr>'
+   +COLS.map(c=>'<th data-s="'+c[0]+'" class="'+(c[2]?'l':'')+(ST.sort===c[0]?' sorted':'')+'">'+c[1]+(ST.sort===c[0]?(ST.sortDir<0?' ↓':' ↑'):'')+'</th>').join('')+'</tr>'
+   +R.map(r=>{const b=BASE[r.g]||{},seg=!noSeg(r);return '<tr><td class="l"><a href="#k'+encodeURIComponent(r.k)+'">'+esc(r.n)+'</a></td><td class="l">'+esc(r.dir)+'</td><td>'+fU(r.sp,0)+'</td>'
+     +'<td class="l">'+esc(r.t?r.t.ht:'')+'</td><td class="l">'+esc(r.t?r.t.fmt:'')+'</td><td class="l">'+esc(r.t?r.t.seg:(r.video?'—':''))+'</td>'
+     +'<td class="'+cls(r.hook,b.hook)+'">'+fP(r.hook)+'</td><td class="'+cls(r.hold,b.hold)+'">'+fP(r.hold)+'</td><td>'+(r.video?r.avg+' с':'—')+'</td><td>'+fP(r.ctr,2)+'</td>'
+     +'<td class="'+cls(r.cpl,b.cpl,1,.08)+'">'+fU(r.cpl)+'</td><td>'+fI(r.ld)+'</td>'
+     +(seg?'<td class="'+cls(r.corePct,b.core,0,.08)+'">'+fP(r.corePct,0)+'</td><td>'+fP(r.sportPct,0)+'</td><td>'+fP(r.begPct,0)+'</td><td class="'+cls(r.cpcore,b.cpcore,1,.08)+'">'+fU(r.cpcore)+'</td>':'<td colspan="4" class="mut">'+(r.dir==='Bust_plus'?'нет анкеты':'анкет < 20')+'</td>')
+     +'<td>'+r.s+'</td><td>'+fP(r.romi,0)+'</td><td class="l"><span class="pill '+r.v[0]+'">'+esc(r.v[1])+'</span></td></tr>';}).join('')
+   +'</table></div></section>';}
+function heat(v,b,inv,span,txt){if(v==null||b==null||!isFinite(v))return '<td class="mut">—</td>';let rel=(v-b)/b;if(inv)rel=-rel;rel=Math.max(-1,Math.min(1,rel/(span||.5)));
+  const pct=Math.round(12+Math.abs(rel)*50);return '<td style="background:color-mix(in srgb,var('+(rel>=0?'--good':'--bad')+') '+pct+'%,transparent)">'+txt+'</td>';}
+function matrix(){let h='';
+  for(const g of ['ТЗ','ГП']){const b=BASE[g];if(!b||!b.n)continue;
+    const G=ROWS.filter(r=>r.g===g&&r.video&&r.t&&r.dir!=='Bust_plus'&&r.sp>=ST.minSp&&(ST.dir==='all'||r.dir===ST.dir));if(!G.length)continue;
+    const by={};G.forEach(r=>{(by[r.t.ht]=by[r.t.ht]||[]).push(r);});
+    const A=Object.entries(by).map(([k,v])=>[k,agg(v)]).sort((a,b)=>b[1].sp-a[1].sp);
+    h+='<h3 style="margin-top:6px">'+g+' · среднее: hook '+fP(b.hook)+', hold '+fP(b.hold)+', 1+ год '+fP(b.core,0)+', спортсмены '+fP(b.sport,0)+', новички '+fP(b.beg,0)+', лид 1+ год '+fU(b.cpcore)+'</h3>'
+      +'<div class="tscroll"><table class="heat"><tr><th class="l">Приём хука</th><th>Hook</th><th>Hold</th><th>1+ год</th><th>Спортсмены</th><th>Новички</th><th>Лид 1+ год</th><th>ROMI</th></tr>'
+      +A.map(([k,a])=>'<tr><th class="l">'+esc(k)+'<br><span class="mut" style="text-transform:none;letter-spacing:0">'+a.n+' видео · '+fU(a.sp,0)+'</span></th>'
+        +heat(a.hook,b.hook,0,.5,fP(a.hook))+heat(a.hold,b.hold,0,.4,fP(a.hold))+heat(a.core,b.core,0,.4,fP(a.core,0))+heat(a.sport,b.sport,0,.6,fP(a.sport,0))+heat(a.beg,b.beg,1,.4,fP(a.beg,0))+heat(a.cpcore,b.cpcore,1,.5,fU(a.cpcore))+heat(a.romi,b.romi,0,.6,fP(a.romi,0))+'</tr>').join('')
+      +'</table></div>';}
+  return h||'<div class="empty">Нет размеченных видео за период.</div>';}
+function curves(){
+  const G=ROWS.filter(r=>r.video&&r.t&&r.v3>0&&r.t.fmt!=='Моушн-шаблон'&&r.sp>=ST.minSp&&(ST.dir==='all'||r.dir===ST.dir));if(!G.length)return '';
+  const by={};G.forEach(r=>{(by[r.t.fmt]=by[r.t.fmt]||[]).push(r);});
+  const cols=['var(--plan)','var(--good)','var(--warn)','var(--bad)','var(--accent)'];
+  const A=Object.entries(by).map(([k,v])=>[k,agg(v)]).sort((a,b)=>b[1].sp-a[1].sp).slice(0,5);
+  const W=640,H=280,L=46,T=12,Bm=30,xs=[0,1,2,3,4].map(i=>L+i*(W-L-16)/4),y=p=>T+(100-Math.min(p,100))/100*(H-T-Bm);
+  let s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Кривые досмотра по форматам">';
+  [0,25,50,75,100].forEach(p=>{s+='<line x1="'+L+'" x2="'+(W-16)+'" y1="'+y(p)+'" y2="'+y(p)+'" stroke="var(--border2)"/><text x="'+(L-8)+'" y="'+(y(p)+4)+'" text-anchor="end">'+p+'%</text>';});
+  ['3 сек','25%','50%','75%','100%'].forEach((l,i)=>{s+='<text x="'+xs[i]+'" y="'+(H-10)+'" text-anchor="middle">'+l+'</text>';});
+  A.forEach(([k,a],i)=>{const pts=[100,a.r25,a.r50,a.r75,a.r100];s+='<polyline fill="none" stroke="'+cols[i]+'" stroke-width="2.5" points="'+pts.map((p,j)=>xs[j]+','+y(p||0)).join(' ')+'"/>';
+    pts.forEach((p,j)=>{s+='<circle cx="'+xs[j]+'" cy="'+y(p||0)+'" r="3" fill="'+cols[i]+'"><title>'+esc(k)+': '+fP(p,0)+'</title></circle>';});});
+  s+='</svg>';
+  return '<section><h2>Кривые досмотра по форматам</h2><p class="note">Доля от 3-секундных просмотров, досмотревшая до 25 / 50 / 75 / 100% ролика. Моушн-шаблоны не показаны: у коротких роликов 25% наступает раньше 3 секунд.</p>'
+   +'<div class="split"><div class="panel chart">'+s+'</div><div class="tscroll"><table><tr><th class="l">Формат</th><th>Видео</th><th>Расход</th><th>Hook</th><th>Hold</th><th>до 25%</th><th>до 100%</th></tr>'
+   +A.map(([k,a],i)=>'<tr><td class="l"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:'+cols[i]+'"></span>'+esc(k)+'</td><td>'+a.n+'</td><td>'+fU(a.sp,0)+'</td><td>'+fP(a.hook)+'</td><td>'+fP(a.hold)+'</td><td>'+fP(a.r25,0)+'</td><td>'+fP(a.r100,0)+'</td></tr>').join('')
+   +'</table></div></div></section>';}
+function hit(){const G=ROWS.filter(r=>r.video&&r.t&&r.dir!=='Bust_plus'&&r.sp>=ST.minSp&&(ST.dir==='all'||r.dir===ST.dir));if(!G.length)return '';
+  const by={};G.forEach(r=>{const key=r.g+'|'+r.t.seg;(by[key]=by[key]||[]).push(r);});
+  const A=Object.entries(by).map(([k,v])=>[k.split('|'),agg(v)]).sort((a,b)=>a[0][0].localeCompare(b[0][0])||b[1].sp-a[1].sp);
+  return '<section><h2>Попадание в сегмент</h2><p class="note">Группировка по тому, к кому ролик обращается по содержанию, и кто реально пришёл.</p><div class="tscroll"><table><tr><th class="l">Напр.</th><th class="l">Сегмент по содержанию</th><th>Видео</th><th>Расход</th><th>Hook</th><th>Hold</th><th>1+ год</th><th>Спортсмены</th><th>Новички</th><th>Лид 1+ год</th><th>ROMI</th></tr>'
+   +A.map(([k,a])=>{const b=BASE[k[0]];return '<tr><td class="l">'+k[0]+'</td><td class="l"><b>'+esc(k[1])+'</b></td><td>'+a.n+'</td><td>'+fU(a.sp,0)+'</td><td class="'+cls(a.hook,b.hook)+'">'+fP(a.hook)+'</td><td class="'+cls(a.hold,b.hold)+'">'+fP(a.hold)+'</td>'
+     +'<td class="'+cls(a.core,b.core,0,.08)+'">'+fP(a.core,0)+'</td><td>'+fP(a.sport,0)+'</td><td class="'+cls(a.beg,b.beg,1,.08)+'">'+fP(a.beg,0)+'</td><td class="'+cls(a.cpcore,b.cpcore,1,.08)+'">'+fU(a.cpcore)+'</td><td>'+fP(a.romi,0)+'</td></tr>';}).join('')
+   +'</table></div></section>';}
+
+/* ===== загрузка ===== */
+async function load(force){
+  if(LOADING)return;LOADING=true;$('bLoad').disabled=true;$('bLoad').textContent='⏳ Загрузка…';
+  showMsg('Собираю данные Meta и amoCRM за '+ddmm(ST.from)+' – '+ddmm(ST.to)+'… Первый запрос за длинный период может занять 2–4 минуты.');
+  try{
+    const [d,t]=await Promise.all([apiGet({action:'audit',from:ST.from,to:ST.to,force:force?1:0},380000),apiGet({action:'gettags'},60000).catch(()=>null)]);
+    if(!d||d.error)throw new Error(d&&d.error?d.error:'пустой ответ');
+    if(!d.creatives)throw new Error('скрипт не знает запрос audit — добавьте audit.gs и обновите развёртывание');
+    DATA=d;TAGS=(t&&t.tags)||{};ROWS=d.creatives.map(derive);
+    let note='';if(d.partial)note='Часть месяцев amoCRM ещё докачивается ('+d.missing.join(', ')+'), лиды по ним не учтены. Нажмите «Обновить» через минуту.';
+    if(d.fbErr)note+=(note?' ':'')+'Ошибка Meta: '+esc(d.fbErr);
+    showMsg(note,note?'err':'');render();
+  }catch(e){showMsg('Не удалось загрузить: '+(e&&e.message||e),'err');}
+  finally{LOADING=false;$('bLoad').disabled=false;$('bLoad').textContent=DATA?'🔄 Обновить':'⬇ Загрузить';}
+}
+
+/* ===== разметка ===== */
+let EDIT='';
+function fillSel(id,list,v){$(id).innerHTML='<option value=""></option>'+list.map(x=>'<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>').join('')+(v&&!list.includes(v)?'<option selected>'+esc(v)+'</option>':'');}
+function openTag(k){EDIT=k;const r=ROWS.find(x=>x.k===k),t=TAGS[k]||{};
+  $('dlgT').textContent='Разметка: '+(r?r.n:k);$('fTxt').value=t.txt||'';fillSel('fHt',HT_LIST,t.ht);fillSel('fSeg',SEG_LIST,t.seg);fillSel('fFmt',FMT_LIST,t.fmt);
+  $('fHero').value=t.hero||'';$('fFf').value=t.ff||'';$('fMean').value=t.mean||'';$('fOffer').value=t.offer||'';$('dlg').showModal();}
+async function saveTag(del){const k=EDIT;if(!k)return;
+  const t=del?null:{txt:$('fTxt').value.trim(),ht:$('fHt').value,seg:$('fSeg').value,fmt:$('fFmt').value,hero:$('fHero').value.trim(),ff:$('fFf').value.trim(),mean:$('fMean').value.trim(),offer:$('fOffer').value.trim()};
+  if(t&&(!t.ht||!t.seg||!t.fmt)){alertBox('Заполните приём хука, сегмент и формат.');return;}
+  $('dSave').disabled=true;
+  try{const r=await apiGet({action:'settag',k,t:t?JSON.stringify(t):''},40000);if(!r||r.error)throw new Error(r&&r.error||'нет ответа');
+    if(t)TAGS[k]=t;else delete TAGS[k];ROWS=DATA.creatives.map(derive);$('dlg').close();render();showMsg('Разметка сохранена.','ok');}
+  catch(e){alertBox('Не сохранилось: '+(e&&e.message||e));}finally{$('dSave').disabled=false;}}
+function alertBox(t){let p=$('dlgErr');if(!p){p=document.createElement('p');p.id='dlgErr';p.className='msg err';$('frm').appendChild(p);}p.innerHTML=esc(t);}
+
+/* ===== CSV ===== */
+function csv(){const R=filtered().slice().sort(sorter);const head=['Креатив','Направление','Расход $','Приём хука','Хук','Формат','Сегмент по содержанию','Hook %','Hold %','CTR %','CPL $','Лиды','1+ год %','Спортсмены %','Новички %','Лид 1+ год $','Продаж','ROMI %','Вердикт','Ролик'];
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"',n=v=>v==null||!isFinite(v)?'':String(Math.round(v*10)/10).replace('.',',');
+  const lines=[head.map(q).join(';')].concat(R.map(r=>[r.n,r.dir,n(r.sp),r.t?r.t.ht:'',r.t?r.t.txt:'',r.t?r.t.fmt:'',r.t?r.t.seg:'',n(r.hook),n(r.hold),n(r.ctr),n(r.cpl),r.ld,n(r.corePct),n(r.sportPct),n(r.begPct),n(r.cpcore),r.s,n(r.romi),r.v[1],fbLink(r)].map(q).join(';')));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8'}));a.download='audit_'+ST.from+'_'+ST.to+'.csv';document.body.appendChild(a);a.click();a.remove();}
+
+/* ===== управление ===== */
+function presets(){const t=todayISO(),y=t.slice(0,4),m=t.slice(0,8),pm=new Date(+y,+t.slice(5,7)-2,1),pe=new Date(+y,+t.slice(5,7)-1,0);
+  const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return [['30 дней',addDays(t,-29),t],['90 дней',addDays(t,-89),t],['Этот месяц',m+'01',t],['Прошлый месяц',iso(pm),iso(pe)],['С начала года',y+'-01-01',t]];}
+function syncBar(){$('dFrom').value=ST.from;$('dTo').value=ST.to;$('minSp').value=ST.minSp;$('rate').value=ST.rate;
+  $('presets').innerHTML=presets().map(p=>'<button class="chip'+(p[1]===ST.from&&p[2]===ST.to?' on':'')+'" data-f="'+p[1]+'" data-t="'+p[2]+'">'+p[0]+'</button>').join('');
+  $('dirs').innerHTML=DIRS.map(d=>'<button class="chip'+(ST.dir===d?' on':'')+'" data-d="'+d+'">'+(d==='all'?'Все':d)+'</button>').join('');
+  $('kind').innerHTML=[['video','Видео'],['all','Все'],['untag','Без разметки']].map(k=>'<button class="chip'+(ST.kind===k[0]?' on':'')+'" data-k="'+k[0]+'">'+k[1]+'</button>').join('');}
+function setPeriod(f,t){ST.from=f;ST.to=t;store.set('aud_from',f);store.set('aud_to',t);syncBar();load(false);}
+$('presets').addEventListener('click',e=>{const b=e.target.closest('.chip');if(b)setPeriod(b.dataset.f,b.dataset.t);});
+$('dirs').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;ST.dir=b.dataset.d;store.set('aud_dir',ST.dir);syncBar();render();});
+$('kind').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;ST.kind=b.dataset.k;store.set('aud_kind',ST.kind);syncBar();render();});
+$('dFrom').addEventListener('change',e=>{if(e.target.value){ST.from=e.target.value;store.set('aud_from',ST.from);syncBar();}});
+$('dTo').addEventListener('change',e=>{if(e.target.value){ST.to=e.target.value;store.set('aud_to',ST.to);syncBar();}});
+$('minSp').addEventListener('change',e=>{ST.minSp=Math.max(0,+e.target.value||0);store.set('aud_min',ST.minSp);render();});
+$('rate').addEventListener('change',e=>{ST.rate=Math.max(1,+e.target.value||465);store.set('ia_rate',ST.rate);if(DATA){ROWS=DATA.creatives.map(derive);render();}});
+$('bLoad').addEventListener('click',()=>load(!!DATA&&DATA.from===ST.from&&DATA.to===ST.to));
+$('bCsv').addEventListener('click',csv);
+$('app').addEventListener('click',e=>{const a=e.target.closest('[data-tag]');if(a){e.preventDefault();openTag(a.dataset.tag);return;}
+  const th=e.target.closest('th[data-s]');if(th){const k=th.dataset.s;if(ST.sort===k)ST.sortDir*=-1;else{ST.sort=k;ST.sortDir=(['n','dir','ht','fmt','seg','vv'].includes(k)?1:-1);}store.set('aud_sort',ST.sort);render();}});
+$('dSave').addEventListener('click',()=>saveTag(false));$('dDel').addEventListener('click',()=>saveTag(true));$('dCancel').addEventListener('click',()=>$('dlg').close());
+syncBar();load(false);
+</script>
+</body>
+</html>
